@@ -66,16 +66,16 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground">ยอดขาย</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">฿{fmt(summary?.totalRevenue ?? 0)}</p>
+            <p className="text-xl sm:text-2xl font-bold tabular-nums">฿{fmt(summary?.totalRevenue ?? 0)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -84,7 +84,7 @@ export default function DashboardPage() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{summary?.totalOrders ?? 0}</p>
+            <p className="text-xl sm:text-2xl font-bold tabular-nums">{summary?.totalOrders ?? 0}</p>
           </CardContent>
         </Card>
         <Card>
@@ -93,7 +93,7 @@ export default function DashboardPage() {
             <BarChart2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">฿{fmt(summary?.totalCost ?? 0)}</p>
+            <p className="text-xl sm:text-2xl font-bold tabular-nums">฿{fmt(summary?.totalCost ?? 0)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -102,7 +102,7 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">฿{fmt(summary?.totalProfit ?? 0)}</p>
+            <p className="text-xl sm:text-2xl font-bold text-green-600 tabular-nums">฿{fmt(summary?.totalProfit ?? 0)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -111,7 +111,7 @@ export default function DashboardPage() {
             <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="text-xl sm:text-2xl font-bold text-blue-600 tabular-nums">
               {summary && summary.totalRevenue > 0
                 ? `${(((summary.totalRevenue - (summary.totalCost ?? 0)) / summary.totalRevenue) * 100).toFixed(1)}%`
                 : "—"}
@@ -161,7 +161,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         {lowStock.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row items-center gap-2">
@@ -238,7 +238,7 @@ export default function DashboardPage() {
                   <div key={i} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Badge variant={p.class === "A" ? "default" : p.class === "B" ? "secondary" : "outline"} className="w-6 justify-center text-xs">{p.class}</Badge>
-                      <span className="text-sm truncate max-w-[180px]">{p.productName}</span>
+                      <span className="text-sm truncate max-w-[140px] sm:max-w-[180px]">{p.productName}</span>
                     </div>
                     <span className="text-sm font-medium">฿{fmt(p.totalRevenue)}</span>
                   </div>

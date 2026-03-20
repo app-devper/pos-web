@@ -18,6 +18,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <SettingsProvider>
       <ProductCacheProvider>
       <ConfirmDialogProvider>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md">ข้ามไปยังเนื้อหาหลัก</a>
       <div className="flex h-screen overflow-hidden">
         {/* Desktop sidebar */}
         <aside className="hidden md:flex md:w-60 lg:w-64 shrink-0 flex-col">
@@ -42,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </Sheet>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto bg-muted/30">
+        <main id="main-content" className="flex-1 overflow-y-auto bg-muted/30">
           <div className="p-4 md:p-6">{children}</div>
         </main>
       </div>

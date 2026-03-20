@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { listProducts, getProduct } from "@/lib/pos-api";
 import type { ProductDetail } from "@/types/pos";
 
@@ -51,8 +51,16 @@ export function ProductCacheProvider({ children }: { children: React.ReactNode }
     refresh();
   }, [refresh]);
 
+  const value = useMemo<ProductCacheContextValue>(() => ({
+    products,
+    loading,
+    lastFetched,
+    refresh,
+    updateById,
+  }), [products, loading, lastFetched, refresh, updateById]);
+
   return (
-    <ProductCacheContext value={{ products, loading, lastFetched, refresh, updateById }}>
+    <ProductCacheContext value={value}>
       {children}
     </ProductCacheContext>
   );

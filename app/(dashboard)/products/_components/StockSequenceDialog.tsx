@@ -108,7 +108,7 @@ export default function StockSequenceDialog({ open, onOpenChange, stocks, units,
     }
   }
 
-  const getUnitName = (id: string) => units.find((u) => u.id === id)?.unit ?? "-";
+  const getUnitName = (id: string) => units.find((u) => u.id === id)?.unit || "ชิ้น";
   const getBranchName = (id: string) => branches.find((b) => b.id === id)?.name ?? id;
 
   return (

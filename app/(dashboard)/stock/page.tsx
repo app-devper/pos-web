@@ -44,6 +44,13 @@ export default function StockPage() {
   const [adjustQty, setAdjustQty] = useState(0);
   const [adjusting, setAdjusting] = useState(false);
 
+  const fmtDate = (value?: string) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" });
+  };
+
   useEffect(() => {
     Promise.all([listProducts(), listBranches()])
       .then(([p, b]) => {
@@ -90,16 +97,21 @@ export default function StockPage() {
     try {
       if (editingStock) {
         await updateProductStock(editingStock.id, {
+          productId: sheetProduct.id,
           unitId: stockForm.unitId,
           costPrice: stockForm.costPrice,
+          expireDate: editingStock.expireDate ?? new Date().toISOString(),
+          importDate: editingStock.importDate ?? new Date().toISOString(),
         });
       } else {
         await createProductStock({
           productId: sheetProduct.id,
           branchId: stockForm.branchId,
-          unitId: stockForm.unitId || undefined,
+          unitId: stockForm.unitId,
           quantity: stockForm.quantity,
           costPrice: stockForm.costPrice,
+          expireDate: new Date().toISOString(),
+          importDate: new Date().toISOString(),
         });
       }
       toast.success(editingStock ? "อัปเดต stock แล้ว" : "เพิ่ม stock แล้ว");
@@ -144,7 +156,7 @@ export default function StockPage() {
   const getBranchName = (id: string) => branches.find((b) => b.id === id)?.name ?? id;
   const getUnitLabel = (id: string) => {
     const u = units.find((u) => u.id === id);
-    return u ? `${u.unit} (x${u.size})` : id;
+    return u ? `${u.unit || "ชิ้น"} (x${u.size})` : id;
   };
 
   const filtered = products.filter((p) =>
@@ -199,7 +211,7 @@ export default function StockPage() {
                     <TableCell className="font-medium">{p.name}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.serialNumber}</TableCell>
                     <TableCell>{p.category ?? "-"}</TableCell>
-                    <TableCell>{p.unit}</TableCell>
+                    <TableCell>{p.unit || "ชิ้น"}</TableCell>
                     <TableCell className="text-right">
                       {(() => {
                         const total = Array.isArray(p.stocks) && p.stocks.length > 0
@@ -254,6 +266,7 @@ export default function StockPage() {
                   <TableRow>
                     <TableHead>สาขา</TableHead>
                     <TableHead>หน่วย</TableHead>
+                    <TableHead>หมดอายุ</TableHead>
                     <TableHead className="text-right">จำนวน</TableHead>
                     <TableHead className="text-right">ต้นทุน</TableHead>
                     <TableHead className="w-28" />
@@ -264,6 +277,7 @@ export default function StockPage() {
                     <TableRow key={s.id}>
                       <TableCell className="text-sm">{getBranchName(s.branchId)}</TableCell>
                       <TableCell className="text-sm">{getUnitLabel(s.unitId)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{fmtDate(s.expireDate)}</TableCell>
                       <TableCell className="text-right">
                         <span className={s.quantity <= 0 ? "text-destructive font-semibold" : s.quantity <= 10 ? "text-yellow-600 font-semibold" : "font-medium"}>
                           {s.quantity}
@@ -318,7 +332,7 @@ export default function StockPage() {
                 <SelectTrigger><SelectValue placeholder="เลือกหน่วย (ถ้ามี)" /></SelectTrigger>
                 <SelectContent>
                   {units.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>{u.unit} (x{u.size})</SelectItem>
+                    <SelectItem key={u.id} value={u.id}>{u.unit || "ชิ้น"} (x{u.size})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

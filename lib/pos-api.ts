@@ -10,6 +10,7 @@ import type {
   ProductStockRequest,
   UpdateProductStockRequest,
   ProductHistory,
+  CreateProductUnitRequest,
   ProductUnitRequest,
   CreateOrderRequest,
   Order,
@@ -32,6 +33,7 @@ import type {
   StockTransfer,
   StockTransferRequest,
   CustomerHistoryRequest,
+  PharmacyReportResponse,
   Employee,
   EmployeeRequest,
   BarcodeRequest,
@@ -132,7 +134,7 @@ export const updateStockSequence = (stocks: { stockId: string; sequence: number 
 export const getProductUnits = (productId: string) =>
   posApi.get<ProductUnit[]>(`/products/${productId}/units`).then((r) => r.data);
 
-export const createProductUnit = (data: ProductUnitRequest) =>
+export const createProductUnit = (data: CreateProductUnitRequest) =>
   posApi.post("/products/units", data).then((r) => r.data);
 
 export const updateProductUnit = (unitId: string, data: ProductUnitRequest) =>
@@ -185,7 +187,7 @@ export const deleteLot = (lotId: string) =>
 
 // ─── Orders ──────────────────────────────────────────────────
 export const createOrder = (data: CreateOrderRequest) =>
-  posApi.post("/orders", data).then((r) => r.data);
+  posApi.post("/orders", data).then((r) => r.data?.data ?? r.data);
 
 export const listOrders = (startDate: string, endDate: string) =>
   posApi.get<Order[]>("/orders", { params: { startDate, endDate } }).then((r) => r.data);
@@ -305,6 +307,9 @@ export const updateReceiveTotalCost = (receiveId: string, data: { totalCost: num
 
 export const updateReceiveItems = (receiveId: string, data: { items: ReceiveItemData[] }) =>
   posApi.patch<Receive>(`/receives/${receiveId}/items`, data).then((r) => r.data);
+
+export const importReceiveToStock = (receiveId: string) =>
+  posApi.patch<Receive>(`/receives/${receiveId}/import`).then((r) => r.data);
 
 // ─── Branches ─────────────────────────────────────────────────
 export const listBranches = () =>
@@ -483,6 +488,9 @@ export const downloadReport = async (path: string, params?: Record<string, strin
   a.click();
   URL.revokeObjectURL(url);
 };
+
+export const getPharmacyReportData = (key: "khy9" | "khy10" | "khy11" | "khy12" | "khy13", params: { startDate: string; endDate: string }) =>
+  posApi.get<PharmacyReportResponse>(`/reports/pharmacy/${key}/data`, { params }).then((r) => r.data);
 
 export const downloadBarcodePdf = async (data: BarcodeRequest) => {
   const token = getToken();

@@ -47,6 +47,7 @@ export interface ProductStock {
   quantity: number;
   costPrice: number;
   price?: number;
+  import?: number;
   lotNumber?: string;
   receiveCode?: string;
   expireDate?: string;
@@ -63,6 +64,7 @@ export interface Product {
   costPrice: number;
   unit: string;
   quantity: number;
+  soldFirst?: number;
   serialNumber: string;
   category?: string;
   status?: string;
@@ -107,28 +109,30 @@ export interface UpdateProductRequest {
 export interface ProductStockRequest {
   productId: string;
   branchId?: string;
-  unitId?: string;
+  unitId: string;
   quantity: number;
   costPrice?: number;
   price?: number;
   lotNumber?: string;
   receiveCode?: string;
-  expireDate?: string;
-  importDate?: string;
+  expireDate: string;
+  importDate: string;
 }
 
 export interface UpdateProductStockRequest {
-  productId?: string;
-  unitId?: string;
+  productId: string;
+  unitId: string;
   costPrice?: number;
   price?: number;
   lotNumber?: string;
-  expireDate?: string;
-  importDate?: string;
+  expireDate: string;
+  importDate: string;
 }
 
 export interface ProductHistory {
   id: string;
+  branchId: string;
+  productId: string;
   type: string;
   description: string;
   unit: string;
@@ -140,12 +144,22 @@ export interface ProductHistory {
   createdDate: string;
 }
 
+export interface CreateProductUnitRequest {
+  productId: string;
+  unit: string;
+  size: number;
+  costPrice: number;
+  price: number;
+  volume?: number;
+  volumeUnit?: string;
+  barcode?: string;
+}
+
 export interface ProductUnitRequest {
-  productId?: string;
-  unit?: string;
-  size?: number;
-  costPrice?: number;
-  price?: number;
+  productId: string;
+  unit: string;
+  size: number;
+  costPrice: number;
   volume?: number;
   volumeUnit?: string;
   barcode?: string;
@@ -189,6 +203,34 @@ export interface OrderItem {
 export interface OrderPayment {
   type: "CASH" | "CREDIT" | "PROMPTPAY" | "TRANSFER";
   amount: number;
+}
+
+export interface OrderDetailItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  unitId: string;
+  quantity: number;
+  price: number;
+  costPrice: number;
+  discount: number;
+  product: Product;
+}
+
+export interface OrderDetailPayment {
+  id: string;
+  orderId: string;
+  status: string;
+  amount: number;
+  total: number;
+  change: number;
+  type: string;
+  createdDate?: string;
+}
+
+export interface OrderDetail extends Order {
+  items: OrderDetailItem[];
+  payment: OrderDetailPayment;
 }
 
 export interface CreateOrderRequest {
@@ -549,6 +591,27 @@ export interface CustomerHistoryRequest {
   type: string;
   description: string;
   reference?: string;
+}
+
+export interface PharmacyReportItem {
+  date: string;
+  code?: string;
+  productName: string;
+  genericName?: string;
+  lotNumber?: string;
+  quantity: number;
+  costPrice?: number;
+  pharmacistName?: string;
+  licenseNo?: string;
+  drugType?: string;
+}
+
+export interface PharmacyReportResponse {
+  key: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  items: PharmacyReportItem[];
 }
 
 // ─── Dashboard ────────────────────────────────────────────

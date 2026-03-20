@@ -96,6 +96,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   })).filter((g) => g.items.length > 0);
 
   async function handleLogout() {
+    if (!window.confirm("คุณต้องการออกจากระบบหรือไม่?")) return;
     try {
       await authLogout();
     } catch {
@@ -133,9 +134,9 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                   <span className="flex-1">{label}</span>
-                  {active && <ChevronRight className="h-3 w-3" />}
+                  {active && <ChevronRight className="h-3 w-3" aria-hidden="true" />}
                 </Link>
               );
             })}
@@ -146,7 +147,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
 
       <div className="p-3 border-t">
         <Button variant="ghost" className="w-full justify-start gap-2 text-destructive hover:text-destructive" onClick={handleLogout}>
-          <LogOut className="h-4 w-4" />
+          <LogOut className="h-4 w-4" aria-hidden="true" />
           ออกจากระบบ
         </Button>
       </div>

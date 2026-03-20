@@ -65,9 +65,9 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">ผู้จัดจำหน่าย</h1>
-        <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />เพิ่ม</Button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">ผู้จัดจำหน่าย</h1>
+        <Button onClick={openCreate} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />เพิ่ม</Button>
       </div>
       <Card>
         <CardHeader className="pb-3">
@@ -78,9 +78,10 @@ export default function SuppliersPage() {
         </CardHeader>
         <CardContent className="p-0">
           {loading ? <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>ชื่อ</TableHead><TableHead>โทรศัพท์</TableHead><TableHead>อีเมล</TableHead><TableHead className="w-20" />
+                <TableHead>ชื่อ</TableHead><TableHead>โทรศัพท์</TableHead><TableHead className="hidden sm:table-cell">อีเมล</TableHead><TableHead className="w-20" />
               </TableRow></TableHeader>
               <TableBody>
                 {filtered.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">ไม่พบข้อมูล</TableCell></TableRow>}
@@ -88,7 +89,7 @@ export default function SuppliersPage() {
                   <TableRow key={s.id as string}>
                     <TableCell className="font-medium">{s.name as string}</TableCell>
                     <TableCell>{(s.phone as string) ?? "-"}</TableCell>
-                    <TableCell>{(s.email as string) ?? "-"}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{(s.email as string) ?? "-"}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
@@ -99,6 +100,7 @@ export default function SuppliersPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

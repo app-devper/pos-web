@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createProductPrice, updateProductPrice } from "@/lib/pos-api";
+import { CUSTOMER_TYPES } from "@/app/(dashboard)/sale/_utils";
 
-interface ProductPrice { id: string; productId: string; customerType: string; price: number; }
+interface ProductPrice { id: string; productId: string; unitId?: string; customerType: string; price: number; }
 
 interface Props {
   open: boolean;
@@ -21,11 +22,6 @@ interface Props {
   onSaved: () => void;
 }
 
-const CUSTOMER_TYPES = [
-  { value: "General", label: "หน้าร้าน" },
-  { value: "Regular", label: "ลูกค้า" },
-  { value: "Wholesaler", label: "ขายส่ง" },
-];
 
 export default function PriceDialog({ open, onOpenChange, productId, unitId, unitName, editing, onSaved }: Props) {
   const [form, setForm] = useState({ customerType: "General", price: 0 });
@@ -45,7 +41,12 @@ export default function PriceDialog({ open, onOpenChange, productId, unitId, uni
     setSaving(true);
     try {
       if (editing) {
-        await updateProductPrice(editing.id, { customerType: form.customerType, price: form.price });
+        await updateProductPrice(editing.id, {
+          productId: editing.productId || productId,
+          unitId: editing.unitId || unitId,
+          customerType: form.customerType,
+          price: form.price,
+        });
       } else {
         await createProductPrice({ productId, unitId, customerType: form.customerType, price: form.price });
       }

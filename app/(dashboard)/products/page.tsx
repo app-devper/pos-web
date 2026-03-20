@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,14 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, ArrowUpDown, X, Package, RefreshCw, ChevronLeft, Upload } from "lucide-react";
-import { createProduct, updateProduct, deleteProduct, listCategories, createProductUnit, createProductPrice, importProductsCsv } from "@/lib/pos-api";
+import { Search, Plus, ArrowUpDown, X, Package, RefreshCw, ChevronLeft, Upload, Download, Barcode, Tag, Sticker, FileSpreadsheet, ArrowRightLeft } from "lucide-react";
+import { createProduct, updateProduct, deleteProduct, listCategories, createProductUnit, createProductPrice, importProductsCsv, downloadReport, downloadBarcodePdf } from "@/lib/pos-api";
 import { useProductCache } from "@/components/ProductCacheContext";
 import type { ProductDetail, CreateProductRequest, Category, CSVImportResult } from "@/types/pos";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import ProductDetailPanel from "./_components/ProductDetailPanel";
 import { ProductDetailProvider } from "./_components/ProductDetailContext";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { printPriceListReport, printPriceTagsReport } from "@/lib/report-print";
 
 
 const DRUG_REGISTRATIONS = [
@@ -48,12 +50,14 @@ interface UnitForm { unit: string; price: number; costPrice: number; barcode: st
 const EMPTY_UNIT: UnitForm = { unit: "", price: 0, costPrice: 0, barcode: "", sku: "" };
 
 export default function ProductsPage() {
+  const router = useRouter();
   const { products: items, loading, refresh } = useProductCache();
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
   const [sortBalance, setSortBalance] = useState(false);
 
   const [selected, setSelected] = useState<ProductDetail | null>(null);
+  const [detailKey, setDetailKey] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ProductDetail | null>(null);
@@ -73,8 +77,21 @@ export default function ProductsPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (selected) {
+      const fresh = items.find((p) => p.id === selected.id);
+      if (fresh) setSelected(fresh);
+      else setSelected(null);
+    }
+  }, [items]);
+
   function selectProduct(p: ProductDetail) {
     setSelected(p);
+    if (formOpen && editing) {
+      openEdit(p);
+    } else if (formOpen) {
+      closeForm();
+    }
   }
 
   function openCreate() {
@@ -89,8 +106,10 @@ export default function ProductsPage() {
     setFormOpen(true);
   }
   function closeForm() {
+    const wasEditing = !!editing;
     setFormOpen(false);
     setEditing(null);
+    if (wasEditing) setDetailKey((k) => k + 1);
   }
 
   async function handleSave() {
@@ -101,11 +120,13 @@ export default function ProductsPage() {
         await updateProduct(editing.id, { name: form.name, nameEn: form.nameEn, description: form.description, category: form.category, status: form.status, drugRegistrations: form.drugRegistrations, drugInfo: form.drugInfo });
         toast.success("อัปเดตสินค้าแล้ว");
         setFormOpen(false);
+        setEditing(null);
+        setDetailKey((k) => k + 1);
       } else {
         if (!form.serialNumber) return toast.error("กรุณากรอกรหัสสินค้า");
         const product = await createProduct(form);
         if (product?.id && unitForm.unit) {
-          const unit = await createProductUnit({ productId: product.id, unit: unitForm.unit, size: 1, costPrice: unitForm.costPrice || form.costPrice, barcode: unitForm.barcode || undefined });
+          const unit = await createProductUnit({ productId: product.id, unit: unitForm.unit, size: 1, costPrice: unitForm.costPrice || form.costPrice, price: unitForm.price, barcode: unitForm.barcode || undefined });
           if (unit?.id && unitForm.price > 0) {
             await createProductPrice({ productId: product.id, unitId: unit.id, customerType: "General", price: unitForm.price });
           }
@@ -145,7 +166,7 @@ export default function ProductsPage() {
     <div className="-m-4 md:-m-6 flex h-screen border-t overflow-hidden bg-background">
 
       {/* ── Left: Product list ── */}
-      <div className="w-72 shrink-0 flex flex-col border-r">
+      <div className={`${selected || formOpen ? "hidden md:flex" : "flex"} w-full md:w-72 shrink-0 flex-col md:border-r`}>
         <div className="flex items-center gap-1 p-2 border-b">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -163,12 +184,6 @@ export default function ProductsPage() {
           </div>
           <Button size="icon" variant={sortBalance ? "default" : "ghost"} className="h-9 w-9 shrink-0" title="เรียงตามคงเหลือ" aria-label="เรียงตามคงเหลือ" onClick={() => setSortBalance((v) => !v)}>
             <ArrowUpDown className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" title="เพิ่มสินค้า" aria-label="เพิ่มสินค้า" onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" title="นำเข้า CSV" aria-label="นำเข้า CSV" onClick={() => { setCsvOpen(true); setCsvFile(null); setCsvResult(null); }}>
-            <Upload className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" title="รีเฟรช" aria-label="รีเฟรช" onClick={() => refresh()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -198,7 +213,7 @@ export default function ProductsPage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{p.name}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {sortBalance ? `คงเหลือ ${qty} ${p.unit}` : p.unit}
+                        {sortBalance ? `คงเหลือ ${qty} ${p.unit || "ชิ้น"}` : (p.unit || "ชิ้น")}
                       </p>
                     </div>
                     <span className={`text-xs font-semibold ml-2 shrink-0 ${qty <= 0 ? "text-destructive" : qty <= 10 ? "text-yellow-600" : "text-muted-foreground"}`}>
@@ -214,29 +229,25 @@ export default function ProductsPage() {
       </div>
 
       {/* ── Right: Detail panel or Form panel ── */}
-      <div className="flex-1 min-w-0 overflow-hidden">
+      <div className={`${!selected && !formOpen ? "hidden md:block" : "block"} flex-1 min-w-0 overflow-hidden`}>
         {formOpen ? (
           <div className="flex flex-col h-full">
             {/* Form header */}
-            <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0">
-              <button onClick={closeForm} className="text-muted-foreground hover:text-foreground">
+            <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b shrink-0">
+              <button onClick={() => { closeForm(); }} className="text-muted-foreground hover:text-foreground">
                 <ChevronLeft className="h-5 w-5" />
               </button>
               <h2 className="text-lg font-semibold">{editing ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}</h2>
             </div>
             {/* Form body */}
-            <div className="flex-1 overflow-y-auto min-h-0 p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 space-y-6">
               {/* ── Section: ข้อมูลสินค้า ── */}
               <div>
                 <h3 className="text-base font-semibold mb-4">ข้อมูลสินค้า</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2 space-y-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2 space-y-1">
                     <Label>ชื่อสินค้า *</Label>
                     <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>ชื่อภาษาอังกฤษ</Label>
-                    <Input value={form.nameEn} onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
                     <Label>รหัสสินค้า *</Label>
@@ -269,7 +280,7 @@ export default function ProductsPage() {
                     <Label>จุดสั่งซื้อขั้นต่ำ (Min Stock)</Label>
                     <Input type="number" min={0} value={form.minStock === 0 ? "" : form.minStock} onChange={(e) => setForm((f) => ({ ...f, minStock: +e.target.value }))} className={NUM_CLS} placeholder="0" />
                   </div>
-                  <div className="col-span-2 space-y-1">
+                  <div className="sm:col-span-2 space-y-1">
                     <Label>รายละเอียด</Label>
                     <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2} />
                   </div>
@@ -283,8 +294,8 @@ export default function ProductsPage() {
                 <div>
                   <h3 className="text-base font-semibold mb-1">ข้อมูลหน่วยนับ และการขาย</h3>
                   <p className="text-xs text-muted-foreground mb-4">สร้างหน่วยนับแรกให้สินค้าอัตโนมัติ (ไม่บังคับ)</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2 space-y-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="sm:col-span-2 space-y-1">
                       <Label>ชื่อหน่วยนับ <span className="text-xs text-muted-foreground font-normal">ภาษาไทย, อังกฤษ และตัวเลข</span></Label>
                       <Input value={unitForm.unit} onChange={(e) => setUnitForm((f) => ({ ...f, unit: e.target.value }))} placeholder="โปรดระบุหน่วยนับ" />
                     </div>
@@ -314,7 +325,7 @@ export default function ProductsPage() {
               {/* ── Section: ข้อมูลยา ── */}
               <div>
                 <h3 className="text-base font-semibold mb-4">ข้อมูลยา</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>ประเภทยา</Label>
                     <Select value={form.drugInfo?.drugType ?? ""} onValueChange={(v) => setForm((f) => ({ ...f, drugInfo: { ...f.drugInfo, drugType: v as CreateProductRequest["drugInfo"] extends { drugType?: infer T } ? T : never } }))}>
@@ -328,7 +339,7 @@ export default function ProductsPage() {
                     <Label>ชื่อสามัญ</Label>
                     <Input value={form.drugInfo?.genericName ?? ""} onChange={(e) => setForm((f) => ({ ...f, drugInfo: { ...f.drugInfo, genericName: e.target.value } }))} placeholder="Generic Name" />
                   </div>
-                  <div className="col-span-2 space-y-1">
+                  <div className="sm:col-span-2 space-y-1">
                     <Label>ยาตีกัน (Drug Interactions)</Label>
                     <Textarea
                       value={(form.drugInfo?.drugInteractions ?? []).join(", ")}
@@ -378,22 +389,79 @@ export default function ProductsPage() {
               </div>
             </div>
             {/* Form footer */}
-            <div className="shrink-0 border-t px-6 py-4 flex justify-end gap-2">
+            <div className="shrink-0 border-t px-4 sm:px-6 py-4 flex justify-end gap-2">
               <Button variant="outline" onClick={closeForm}>ยกเลิก</Button>
               <Button onClick={handleSave} disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
             </div>
           </div>
         ) : !selected ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
-            <Package className="h-12 w-12 opacity-20" />
-            <p className="text-sm">เลือกสินค้าเพื่อดูรายละเอียด</p>
-            <Button variant="outline" size="sm" onClick={openCreate}>
-              <Plus className="h-4 w-4 mr-1" />เพิ่มสินค้าใหม่
-            </Button>
+          <div className="hidden md:flex flex-col h-full overflow-y-auto">
+            <div className="px-6 py-5 border-b shrink-0">
+              <h2 className="text-lg font-semibold">จัดการสินค้า</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">เลือกสินค้าจากรายการ หรือใช้เครื่องมือด้านล่าง</p>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
+              {/* ── Inventory Actions ── */}
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">จัดการคลังสินค้า</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={openCreate} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><Plus className="h-4 w-4" /></div>
+                    <div className="min-w-0"><p className="text-sm font-medium">เพิ่มสินค้า</p><p className="text-xs text-muted-foreground truncate">สร้างรายการใหม่</p></div>
+                  </button>
+                  <button onClick={() => { setCsvOpen(true); setCsvFile(null); setCsvResult(null); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-orange-500/10 text-orange-600"><Upload className="h-4 w-4" /></div>
+                    <div className="min-w-0"><p className="text-sm font-medium">นำเข้า CSV</p><p className="text-xs text-muted-foreground truncate">นำเข้าสินค้าจากไฟล์</p></div>
+                  </button>
+                  <button onClick={() => { downloadReport("/reports/stocks/excel", {}, "stock-report").catch(() => toast.error("ดาวน์โหลดไม่สำเร็จ")); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600"><Download className="h-4 w-4" /></div>
+                    <div className="min-w-0"><p className="text-sm font-medium">ส่งออก Excel</p><p className="text-xs text-muted-foreground truncate">รายงานสต็อกทั้งหมด</p></div>
+                  </button>
+                  <button onClick={() => refresh()} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-sky-500/10 text-sky-600"><RefreshCw className="h-4 w-4" /></div>
+                    <div className="min-w-0"><p className="text-sm font-medium">รีเฟรช</p><p className="text-xs text-muted-foreground truncate">โหลดข้อมูลใหม่</p></div>
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Print Center ── */}
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">ศูนย์พิมพ์</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => { downloadBarcodePdf({ productIds: items.map((p) => p.id) }).catch(() => toast.error("ดาวน์โหลดไม่สำเร็จ")); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-violet-500/10 text-violet-600"><Barcode className="h-4 w-4" /></div>
+                    <div className="min-w-0"><p className="text-sm font-medium">บาร์โค้ด</p><p className="text-xs text-muted-foreground truncate">พิมพ์บาร์โค้ดสินค้า</p></div>
+                  </button>
+                  <button onClick={() => { printPriceTagsReport({ products: items }); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-pink-500/10 text-pink-600"><Tag className="h-4 w-4" /></div>
+                    <div className="min-w-0"><p className="text-sm font-medium">ป้ายราคา</p><p className="text-xs text-muted-foreground truncate">พิมพ์ป้ายราคาสินค้า</p></div>
+                  </button>
+                  <button onClick={() => { printPriceListReport({ products: items }); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-amber-500/10 text-amber-600"><Sticker className="h-4 w-4" /></div>
+                    <div className="min-w-0"><p className="text-sm font-medium">ฉลากยา</p><p className="text-xs text-muted-foreground truncate">รายการราคาทั้งหมด</p></div>
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Analytics ── */}
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">รายงาน</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => { router.push("/reports"); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-indigo-500/10 text-indigo-600"><ArrowRightLeft className="h-4 w-4" /></div>
+                    <div className="min-w-0"><p className="text-sm font-medium">สินค้าเข้า-ออก</p><p className="text-xs text-muted-foreground truncate">รายงานความเคลื่อนไหว</p></div>
+                  </button>
+                  <button onClick={() => { downloadReport("/reports/stocks/excel", {}, "stock-report").catch(() => toast.error("ดาวน์โหลดไม่สำเร็จ")); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-teal-500/10 text-teal-600"><FileSpreadsheet className="h-4 w-4" /></div>
+                    <div className="min-w-0"><p className="text-sm font-medium">รายงานสต็อก</p><p className="text-xs text-muted-foreground truncate">สรุปยอดคงเหลือ Excel</p></div>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
-          <ProductDetailProvider product={selected} onProductReload={refresh}>
-            <ProductDetailPanel onEdit={() => openEdit(selected)} />
+          <ProductDetailProvider key={detailKey} product={selected} onProductReload={refresh}>
+            <ProductDetailPanel onEdit={() => openEdit(selected)} onBack={() => setSelected(null)} />
           </ProductDetailProvider>
         )}
       </div>

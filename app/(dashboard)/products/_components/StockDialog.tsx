@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createProductStock, updateProductStock } from "@/lib/pos-api";
-import type { ProductUnit, ProductStock } from "@/types/pos";
+import type { ProductPrice, ProductUnit, ProductStock } from "@/types/pos";
 
 interface Branch { id: string; name: string; }
 
@@ -30,8 +30,14 @@ interface Props {
   productId: string;
   editing: ProductStock | null;
   units: ProductUnit[];
+  prices: ProductPrice[];
   branches: Branch[];
   onSaved: () => void;
+}
+
+function formatPlaceholderAmount(value?: number): string {
+  if (!value || value <= 0) return "฿0";
+  return `฿${new Intl.NumberFormat("th-TH", { maximumFractionDigits: 2 }).format(value)}`;
 }
 
 function toDateInput(d: string | Date | undefined): string {
@@ -45,15 +51,44 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function StockDialog({ open, onOpenChange, productId, editing, units, branches, onSaved }: Props) {
+function generateLotNumber(): string {
+  const now = new Date();
+  const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const timePart = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+  return `LOT-${datePart}-${timePart}`;
+}
+
+function getUnitDefaults(unitId: string, units: ProductUnit[], prices: ProductPrice[]) {
+  const unit = units.find((item) => item.id === unitId);
+  const retailPrice = prices.find((item) => item.unitId === unitId && item.customerType === "General");
+  return {
+    costPrice: unit?.costPrice ?? 0,
+    price: retailPrice?.price ?? 0,
+  };
+}
+
+export default function StockDialog({ open, onOpenChange, productId, editing, units, prices, branches, onSaved }: Props) {
   const [form, setForm] = useState<StockForm>({
     branchId: "", unitId: "", quantity: 0, costPrice: 0, price: 0,
     lotNumber: "", receiveCode: "", expireDate: "", importDate: todayStr(),
   });
   const [saving, setSaving] = useState(false);
 
+  const selectedUnit = units.find((unit) => unit.id === form.unitId);
+  const selectedRetailPrice = prices.find((price) => price.unitId === form.unitId && price.customerType === "General");
+  const selectedUnitName = selectedUnit?.unit?.trim() || "หน่วย";
+  const quantityPlaceholder = `ระบุจำนวน ${selectedUnitName}`;
+  const costPlaceholder = `${formatPlaceholderAmount(selectedUnit?.costPrice)} จากหน่วยนับ`;
+  const pricePlaceholder = `${formatPlaceholderAmount(selectedRetailPrice?.price)} จากหน่วยนับ`;
+  const selectedDefaults = getUnitDefaults(form.unitId, units, prices);
+  const isUsingUnitCostPrice = form.costPrice === selectedDefaults.costPrice;
+  const isUsingUnitSalePrice = form.price === selectedDefaults.price;
+  const numberInputClass = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+
   useEffect(() => {
     if (open) {
+      const defaultUnitId = editing?.unitId ?? units[0]?.id ?? "";
+      const defaults = getUnitDefaults(defaultUnitId, units, prices);
       setForm(editing ? {
         branchId: editing.branchId,
         unitId: editing.unitId,
@@ -66,20 +101,30 @@ export default function StockDialog({ open, onOpenChange, productId, editing, un
         importDate: toDateInput(editing.importDate) || todayStr(),
       } : {
         branchId: branches[0]?.id ?? "",
-        unitId: units[0]?.id ?? "",
+        unitId: defaultUnitId,
         quantity: 0,
-        costPrice: 0,
-        price: 0,
+        costPrice: defaults.costPrice,
+        price: defaults.price,
         lotNumber: "",
         receiveCode: "",
         expireDate: "",
         importDate: todayStr(),
       });
     }
-  }, [open, editing, branches, units]);
+  }, [open, editing, branches, units, prices]);
 
   function set<K extends keyof StockForm>(key: K, value: StockForm[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function handleUnitChange(unitId: string) {
+    const defaults = getUnitDefaults(unitId, units, prices);
+    setForm((current) => ({
+      ...current,
+      unitId,
+      costPrice: defaults.costPrice,
+      price: defaults.price,
+    }));
   }
 
   async function handleSave() {
@@ -100,7 +145,7 @@ export default function StockDialog({ open, onOpenChange, productId, editing, un
         await createProductStock({
           productId,
           branchId: form.branchId || undefined,
-          unitId: form.unitId || undefined,
+          unitId: form.unitId,
           quantity: form.quantity,
           costPrice: form.costPrice || undefined,
           price: form.price || undefined,
@@ -135,32 +180,35 @@ export default function StockDialog({ open, onOpenChange, productId, editing, un
           )}
           <div className="space-y-1">
             <Label>หน่วย</Label>
-            <Select value={form.unitId} onValueChange={(v) => set("unitId", v)}>
+            <Select value={form.unitId} onValueChange={handleUnitChange}>
               <SelectTrigger><SelectValue placeholder="เลือกหน่วย (ถ้ามี)" /></SelectTrigger>
               <SelectContent>
-                {units.map((u) => <SelectItem key={u.id} value={u.id}>{u.unit} (x{u.size})</SelectItem>)}
+                {units.map((u) => <SelectItem key={u.id} value={u.id}>{u.unit || "ชิ้น"} (x{u.size})</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           {!editing && (
             <div className="space-y-1">
               <Label>จำนวน *</Label>
-              <Input type="number" min={0} value={form.quantity === 0 ? "" : form.quantity} onChange={(e) => set("quantity", +e.target.value)} className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <Input type="number" min={0} value={form.quantity === 0 ? "" : form.quantity} onChange={(e) => set("quantity", +e.target.value)} className={numberInputClass} placeholder={quantityPlaceholder} />
             </div>
           )}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label>ต้นทุน</Label>
-              <Input type="number" min={0} value={form.costPrice === 0 ? "" : form.costPrice} onChange={(e) => set("costPrice", +e.target.value)} className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <Input type="number" min={0} value={form.costPrice === 0 ? "" : form.costPrice} onChange={(e) => set("costPrice", +e.target.value)} className={`${numberInputClass} text-foreground`} placeholder={costPlaceholder} />
             </div>
             <div className="space-y-1">
               <Label>ราคาขาย</Label>
-              <Input type="number" min={0} value={form.price === 0 ? "" : form.price} onChange={(e) => set("price", +e.target.value)} className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <Input type="number" min={0} value={form.price === 0 ? "" : form.price} onChange={(e) => set("price", +e.target.value)} className={`${numberInputClass} text-foreground`} placeholder={pricePlaceholder} />
             </div>
           </div>
           <div className="space-y-1">
-            <Label>เลข Lot</Label>
-            <Input value={form.lotNumber} onChange={(e) => set("lotNumber", e.target.value)} placeholder="ไม่บังคับ" />
+            <Label>Lot Number</Label>
+            <div className="flex gap-2">
+              <Input value={form.lotNumber} onChange={(e) => set("lotNumber", e.target.value)} placeholder="ไม่บังคับ" />
+              <Button type="button" variant="outline" onClick={() => set("lotNumber", generateLotNumber())}>Gen</Button>
+            </div>
           </div>
           {!editing && (
             <div className="space-y-1">

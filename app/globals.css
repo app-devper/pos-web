@@ -135,3 +135,7 @@
 [data-state="open"][data-sheet] {
   overscroll-behavior: contain;
 }
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

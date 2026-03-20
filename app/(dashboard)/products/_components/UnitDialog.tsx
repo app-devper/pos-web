@@ -38,7 +38,7 @@ export default function UnitDialog({ open, onOpenChange, productId, editing, onS
     setSaving(true);
     try {
       if (editing) {
-        await updateProductUnit(editing.id, { unit: form.unit, size: form.size, costPrice: form.costPrice, volume: form.volume || undefined, volumeUnit: form.volumeUnit || undefined, barcode: form.barcode || undefined });
+        await updateProductUnit(editing.id, { productId, unit: form.unit, size: form.size, costPrice: form.costPrice, volume: form.volume || undefined, volumeUnit: form.volumeUnit || undefined, barcode: form.barcode || undefined });
       } else {
         await createProductUnit({ productId, unit: form.unit, size: form.size, costPrice: form.costPrice, price: form.price, volume: form.volume || undefined, volumeUnit: form.volumeUnit || undefined, barcode: form.barcode || undefined });
       }

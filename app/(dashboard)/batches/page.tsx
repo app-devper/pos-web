@@ -24,6 +24,13 @@ interface LotForm {
 
 const EMPTY: LotForm = { productId: "", lotNumber: "", quantity: 0, expireDate: "", costPrice: 0 };
 
+function generateLotNumber() {
+  const now = new Date();
+  const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const timePart = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+  return `LOT-${datePart}-${timePart}`;
+}
+
 export default function BatchesPage() {
   const { products } = useProductCache();
   const [items, setItems] = useState<ProductLot[]>([]);
@@ -202,7 +209,10 @@ export default function BatchesPage() {
             )}
             <div className="space-y-1">
               <Label>เลข Lot *</Label>
-              <Input value={form.lotNumber} onChange={(e) => setForm((f) => ({ ...f, lotNumber: e.target.value }))} />
+              <div className="flex gap-2">
+                <Input value={form.lotNumber} onChange={(e) => setForm((f) => ({ ...f, lotNumber: e.target.value }))} />
+                <Button type="button" variant="outline" onClick={() => setForm((f) => ({ ...f, lotNumber: generateLotNumber() }))}>Gen</Button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">

@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { downloadReport, getReportUrl } from "@/lib/pos-api";
+import { downloadReport, getOrder, getOrdersByCustomer, getPharmacyReportData, getProduct, getProductHistories, getReportUrl, getSetting, listBranches, listCustomers, listOrders, listProducts, listReceives } from "@/lib/pos-api";
 import { FileDown, FileText, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { printCustomerHistoryReport, printPharmacyReport, printPriceListReport, printPriceTagsReport, printProductHistoryReport, printReceiptDocument, printReceivesSummaryReport, printSalesReport } from "@/lib/report-print";
 
 export default function ReportsPage() {
   const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().split("T")[0]; });
@@ -33,6 +34,163 @@ export default function ReportsPage() {
     finally { setLoading(null); }
   };
 
+  const printSalesPdf = async () => {
+    const key = "sales-pdf";
+    setLoading(key);
+    try {
+      const from = new Date(startDate).toISOString();
+      const to = new Date(endDate + "T23:59:59").toISOString();
+      const [orders, setting, branches] = await Promise.all([
+        listOrders(from, to),
+        getSetting().catch(() => undefined),
+        listBranches().catch(() => []),
+      ]);
+      printSalesReport({ startDate: from, endDate: to, orders: Array.isArray(orders) ? orders : [], setting, branches: Array.isArray(branches) ? branches : [] });
+      toast.success("เปิดเอกสารสำหรับบันทึกเป็น PDF แล้ว");
+    } catch {
+      toast.error("สร้างรายงานขายไม่สำเร็จ");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const printCustomerHistoryPdf = async () => {
+    if (!customerCode) return;
+    const key = "cust-hist";
+    setLoading(key);
+    try {
+      const [orders, customers, setting] = await Promise.all([
+        getOrdersByCustomer(customerCode),
+        listCustomers().catch(() => []),
+        getSetting().catch(() => undefined),
+      ]);
+      const customer = Array.isArray(customers) ? customers.find((item) => item.code === customerCode) : undefined;
+      printCustomerHistoryReport({
+        customerCode,
+        customer,
+        orders: Array.isArray(orders) ? orders : [],
+        setting,
+      });
+      toast.success("เปิดเอกสารสำหรับบันทึกเป็น PDF แล้ว");
+    } catch {
+      toast.error("สร้างประวัติลูกค้าไม่สำเร็จ");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const printOrderDocument = async (mode: "receipt" | "tax-invoice") => {
+    if (!orderId) return;
+    const key = mode;
+    setLoading(key);
+    try {
+      const [order, setting, branches] = await Promise.all([
+        getOrder(orderId),
+        getSetting().catch(() => undefined),
+        listBranches().catch(() => []),
+      ]);
+      const branch = Array.isArray(branches) ? branches.find((item) => item.id === order.branchId) : undefined;
+      printReceiptDocument({
+        title: mode === "receipt" ? "ใบเสร็จรับเงิน" : "ใบกำกับภาษี",
+        order,
+        setting,
+        branch,
+        showTaxId: mode === "tax-invoice",
+      });
+      toast.success("เปิดเอกสารสำหรับบันทึกเป็น PDF แล้ว");
+    } catch {
+      toast.error(mode === "receipt" ? "สร้างใบเสร็จไม่สำเร็จ" : "สร้างใบกำกับภาษีไม่สำเร็จ");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const printReceivesPdf = async () => {
+    const key = "receives-pdf";
+    setLoading(key);
+    try {
+      const from = new Date(startDate).toISOString();
+      const to = new Date(endDate + "T23:59:59").toISOString();
+      const [receives, setting] = await Promise.all([
+        listReceives(from, to),
+        getSetting().catch(() => undefined),
+      ]);
+      printReceivesSummaryReport({
+        startDate: from,
+        endDate: to,
+        receives: Array.isArray(receives) ? receives : [],
+        setting,
+      });
+      toast.success("เปิดเอกสารสำหรับบันทึกเป็น PDF แล้ว");
+    } catch {
+      toast.error("สร้างสรุปรับสินค้าไม่สำเร็จ");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const printProductHistoryPdf = async () => {
+    if (!productId) return;
+    const key = "prod-hist";
+    setLoading(key);
+    try {
+      const [product, histories, setting] = await Promise.all([
+        getProduct(productId),
+        getProductHistories(productId),
+        getSetting().catch(() => undefined),
+      ]);
+      printProductHistoryReport({
+        product,
+        histories: Array.isArray(histories) ? histories : [],
+        setting,
+      });
+      toast.success("เปิดเอกสารสำหรับบันทึกเป็น PDF แล้ว");
+    } catch {
+      toast.error("สร้างประวัติสินค้าไม่สำเร็จ");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const printPriceListPdf = async (mode: "prices" | "price-tags") => {
+    const key = mode === "prices" ? "prices-pdf" : "price-tags";
+    setLoading(key);
+    try {
+      const [products, setting] = await Promise.all([
+        listProducts(),
+        getSetting().catch(() => undefined),
+      ]);
+      const items = Array.isArray(products) ? products : [];
+      if (mode === "prices") printPriceListReport({ products: items, setting });
+      else printPriceTagsReport({ products: items, setting });
+      toast.success("เปิดเอกสารสำหรับบันทึกเป็น PDF แล้ว");
+    } catch {
+      toast.error(mode === "prices" ? "สร้างรายการราคาไม่สำเร็จ" : "สร้างป้ายราคาไม่สำเร็จ");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const printPharmacyPdf = async (key: "khy9" | "khy10" | "khy11" | "khy12" | "khy13") => {
+    setLoading(key);
+    try {
+      const dateParams = {
+        startDate: new Date(startDate).toISOString(),
+        endDate: new Date(endDate + "T23:59:59").toISOString(),
+      };
+      const [report, setting] = await Promise.all([
+        getPharmacyReportData(key, dateParams),
+        getSetting().catch(() => undefined),
+      ]);
+      printPharmacyReport({ report, setting });
+      toast.success("เปิดเอกสารสำหรับบันทึกเป็น PDF แล้ว");
+    } catch {
+      toast.error("สร้างรายงานร้านยาไม่สำเร็จ");
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const btnProps = (key: string) => ({
     disabled: loading === key,
     className: "w-full justify-start gap-2",
@@ -54,8 +212,8 @@ export default function ReportsPage() {
         <Card>
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" />รายงานการขาย</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <Button {...btnProps("sales-pdf")} onClick={() => dl("sales-pdf", "/reports/sales/pdf", { startDate: new Date(startDate).toISOString(), endDate: new Date(endDate + "T23:59:59").toISOString() }, "sales-report.pdf")}>
-              <FileDown className="h-4 w-4" />{loading === "sales-pdf" ? "กำลังดาวน์โหลด…" : "รายงานขาย (PDF)"}
+            <Button {...btnProps("sales-pdf")} onClick={printSalesPdf}>
+              <FileDown className="h-4 w-4" />{loading === "sales-pdf" ? "กำลังสร้าง…" : "รายงานขาย (PDF จากหน้าเว็บ)"}
             </Button>
             <Button {...btnProps("sales-excel")} onClick={() => dl("sales-excel", "/reports/sales/excel", { startDate: new Date(startDate).toISOString(), endDate: new Date(endDate + "T23:59:59").toISOString() }, "sales-report.xlsx")}>
               <FileDown className="h-4 w-4" />{loading === "sales-excel" ? "กำลังดาวน์โหลด…" : "รายงานขาย (Excel)"}
@@ -69,11 +227,11 @@ export default function ReportsPage() {
             <Button {...btnProps("stocks-csv")} onClick={() => dl("stocks-csv", "/reports/stocks/csv", undefined, "stocks-report.csv")}>
               <FileDown className="h-4 w-4" />{loading === "stocks-csv" ? "กำลังดาวน์โหลด…" : "รายงานสต็อก (CSV)"}
             </Button>
-            <Button {...btnProps("price-tags")} onClick={() => dl("price-tags", "/reports/price-tags/pdf", undefined, "price-tags.pdf")}>
-              <FileDown className="h-4 w-4" />{loading === "price-tags" ? "กำลังดาวน์โหลด…" : "ป้ายราคา (PDF)"}
+            <Button {...btnProps("price-tags")} onClick={() => printPriceListPdf("price-tags")}>
+              <FileDown className="h-4 w-4" />{loading === "price-tags" ? "กำลังสร้าง…" : "ป้ายราคา (PDF จากหน้าเว็บ)"}
             </Button>
-            <Button {...btnProps("prices-pdf")} onClick={() => dl("prices-pdf", "/reports/prices/pdf", undefined, "prices.pdf")}>
-              <FileDown className="h-4 w-4" />{loading === "prices-pdf" ? "กำลังดาวน์โหลด…" : "รายการราคา (PDF)"}
+            <Button {...btnProps("prices-pdf")} onClick={() => printPriceListPdf("prices")}>
+              <FileDown className="h-4 w-4" />{loading === "prices-pdf" ? "กำลังสร้าง…" : "รายการราคา (PDF จากหน้าเว็บ)"}
             </Button>
           </CardContent>
         </Card>
@@ -82,8 +240,8 @@ export default function ReportsPage() {
         <Card>
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" />รายงานรับสินค้า</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <Button {...btnProps("receives-pdf")} onClick={() => dl("receives-pdf", "/reports/receives/summary/pdf", { startDate: new Date(startDate).toISOString(), endDate: new Date(endDate + "T23:59:59").toISOString() }, "receives-summary.pdf")}>
-              <FileDown className="h-4 w-4" />{loading === "receives-pdf" ? "กำลังดาวน์โหลด…" : "สรุปรับสินค้า (PDF)"}
+            <Button {...btnProps("receives-pdf")} onClick={printReceivesPdf}>
+              <FileDown className="h-4 w-4" />{loading === "receives-pdf" ? "กำลังสร้าง…" : "สรุปรับสินค้า (PDF จากหน้าเว็บ)"}
             </Button>
           </CardContent>
         </Card>
@@ -94,18 +252,18 @@ export default function ReportsPage() {
           <CardContent className="space-y-3">
             <div className="space-y-1"><Label className="text-xs">Order ID</Label><Input value={orderId} onChange={(e) => setOrderId(e.target.value)} placeholder="กรอก Order ID" /></div>
             <div className="flex gap-2">
-              <Button {...btnProps("receipt")} disabled={!orderId || loading === "receipt"} onClick={() => dl("receipt", `/reports/receipt/${orderId}/pdf`, undefined, "receipt.pdf")} className="flex-1 justify-start gap-2">
-                <FileDown className="h-4 w-4" />{loading === "receipt" ? "กำลังดาวน์โหลด…" : "ใบเสร็จ (PDF)"}
+              <Button {...btnProps("receipt")} disabled={!orderId || loading === "receipt"} onClick={() => printOrderDocument("receipt")} className="flex-1 justify-start gap-2">
+                <FileDown className="h-4 w-4" />{loading === "receipt" ? "กำลังสร้าง…" : "ใบเสร็จ (PDF จากหน้าเว็บ)"}
               </Button>
-              <Button size="icon" variant="outline" disabled={!orderId} onClick={() => preview(`/reports/receipt/${orderId}/pdf`)} title="ดูตัวอย่าง" aria-label="ดูตัวอย่างใบเสร็จ">
+              <Button size="icon" variant="outline" disabled={!orderId} onClick={() => printOrderDocument("receipt")} title="เปิดสำหรับพิมพ์" aria-label="เปิดสำหรับพิมพ์ใบเสร็จ">
                 <Eye className="h-4 w-4" />
               </Button>
             </div>
             <div className="flex gap-2">
-              <Button {...btnProps("tax-invoice")} disabled={!orderId || loading === "tax-invoice"} onClick={() => dl("tax-invoice", `/reports/tax-invoice/${orderId}/pdf`, undefined, "tax-invoice.pdf")} className="flex-1 justify-start gap-2">
-                <FileDown className="h-4 w-4" />{loading === "tax-invoice" ? "กำลังดาวน์โหลด…" : "ใบกำกับภาษี (PDF)"}
+              <Button {...btnProps("tax-invoice")} disabled={!orderId || loading === "tax-invoice"} onClick={() => printOrderDocument("tax-invoice")} className="flex-1 justify-start gap-2">
+                <FileDown className="h-4 w-4" />{loading === "tax-invoice" ? "กำลังสร้าง…" : "ใบกำกับภาษี (PDF จากหน้าเว็บ)"}
               </Button>
-              <Button size="icon" variant="outline" disabled={!orderId} onClick={() => preview(`/reports/tax-invoice/${orderId}/pdf`)} title="ดูตัวอย่าง" aria-label="ดูตัวอย่างใบกำกับภาษี">
+              <Button size="icon" variant="outline" disabled={!orderId} onClick={() => printOrderDocument("tax-invoice")} title="เปิดสำหรับพิมพ์" aria-label="เปิดสำหรับพิมพ์ใบกำกับภาษี">
                 <Eye className="h-4 w-4" />
               </Button>
             </div>
@@ -116,13 +274,9 @@ export default function ReportsPage() {
         <Card>
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" />ประวัติสินค้า</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <div className="space-y-1"><Label className="text-xs">Product ID (เฉพาะสินค้า)</Label><Input value={productId} onChange={(e) => setProductId(e.target.value)} placeholder="กรอก Product ID (ถ้าต้องการ)" /></div>
-            <Button {...btnProps("prod-hist")} onClick={() => {
-              const path = productId ? `/reports/product-history/${productId}/pdf` : "/reports/product-history/pdf";
-              const params = !productId ? { startDate: new Date(startDate).toISOString(), endDate: new Date(endDate + "T23:59:59").toISOString() } : undefined;
-              dl("prod-hist", path, params, "product-history.pdf");
-            }}>
-              <FileDown className="h-4 w-4" />{loading === "prod-hist" ? "กำลังดาวน์โหลด…" : "ประวัติสินค้า (PDF)"}
+            <div className="space-y-1"><Label className="text-xs">Product ID (เฉพาะสินค้า)</Label><Input value={productId} onChange={(e) => setProductId(e.target.value)} placeholder="กรอก Product ID" /></div>
+            <Button {...btnProps("prod-hist")} disabled={!productId || loading === "prod-hist"} onClick={printProductHistoryPdf}>
+              <FileDown className="h-4 w-4" />{loading === "prod-hist" ? "กำลังสร้าง…" : "ประวัติสินค้า (PDF จากหน้าเว็บ)"}
             </Button>
           </CardContent>
         </Card>
@@ -132,8 +286,8 @@ export default function ReportsPage() {
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" />ประวัติลูกค้า</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1"><Label className="text-xs">รหัสลูกค้า</Label><Input value={customerCode} onChange={(e) => setCustomerCode(e.target.value)} placeholder="กรอกรหัสลูกค้า" /></div>
-            <Button {...btnProps("cust-hist")} disabled={!customerCode || loading === "cust-hist"} onClick={() => dl("cust-hist", `/reports/customer-history/${customerCode}/pdf`, undefined, "customer-history.pdf")}>
-              <FileDown className="h-4 w-4" />{loading === "cust-hist" ? "กำลังดาวน์โหลด…" : "ประวัติลูกค้า (PDF)"}
+            <Button {...btnProps("cust-hist")} disabled={!customerCode || loading === "cust-hist"} onClick={printCustomerHistoryPdf}>
+              <FileDown className="h-4 w-4" />{loading === "cust-hist" ? "กำลังสร้าง…" : "ประวัติลูกค้า (PDF จากหน้าเว็บ)"}
             </Button>
           </CardContent>
         </Card>
@@ -154,13 +308,13 @@ export default function ReportsPage() {
                 <div key={key} className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{label}</p>
                   <div className="flex gap-1.5">
-                    <Button {...btnProps(key)} className="flex-1 justify-start gap-2" onClick={() => dl(key, `/reports/pharmacy/${key}`, dateParams, `${key}.pdf`)}>
+                    <Button {...btnProps(key)} className="flex-1 justify-start gap-2" onClick={() => printPharmacyPdf(key as "khy9" | "khy10" | "khy11" | "khy12" | "khy13")}>
                       <FileDown className="h-4 w-4" />{loading === key ? "…" : "PDF"}
                     </Button>
                     <Button {...btnProps(`${key}-csv`)} className="flex-1 justify-start gap-2" onClick={() => dl(`${key}-csv`, `/reports/pharmacy/${key}/csv`, dateParams, `${key}.csv`)}>
                       <FileDown className="h-4 w-4" />{loading === `${key}-csv` ? "…" : "CSV"}
                     </Button>
-                    <Button size="icon" variant="outline" onClick={() => preview(`/reports/pharmacy/${key}`, dateParams)} title="ดูตัวอย่าง" aria-label="ดูตัวอย่าง">
+                    <Button size="icon" variant="outline" onClick={() => printPharmacyPdf(key as "khy9" | "khy10" | "khy11" | "khy12" | "khy13")} title="เปิดสำหรับพิมพ์" aria-label="เปิดสำหรับพิมพ์">
                       <Eye className="h-4 w-4" />
                     </Button>
                   </div>
