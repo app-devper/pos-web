@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { applyPromotion } from "@/lib/pos-api";
-import { fmt } from "../_utils";
+
 
 export function usePromotion() {
     const [promoOpen, setPromoOpen] = useState(false);

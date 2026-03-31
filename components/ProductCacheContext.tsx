@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { listProducts, getProduct } from "@/lib/pos-api";
 import type { ProductDetail } from "@/types/pos";
 
@@ -31,7 +32,9 @@ export function ProductCacheProvider({ children }: { children: React.ReactNode }
       const data = await listProducts();
       setProducts(Array.isArray(data) ? data : []);
       setLastFetched(new Date());
-    } catch {
+    } catch (err) {
+      toast.error("ไม่สามารถโหลดข้อมูลสินค้าได้");
+      console.error("Failed to load products:", err);
     } finally {
       setLoading(false);
     }
@@ -43,7 +46,9 @@ export function ProductCacheProvider({ children }: { children: React.ReactNode }
       setProducts((prev) =>
         prev.map((p) => (p.id === id ? updated : p))
       );
-    } catch {
+    } catch (err) {
+      toast.error("ไม่สามารถอัปเดตข้อมูลสินค้าได้");
+      console.error("Failed to update product:", err);
     }
   }, []);
 

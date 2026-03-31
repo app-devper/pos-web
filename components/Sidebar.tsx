@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard, Package, ShoppingCart, Tag, Users, Truck,
-  ClipboardList, Building2, Settings, FileText,
-  Receipt, CreditCard, FileCheck, Percent, Heart, Pill,
-  ArrowLeftRight, BarChart3, LogOut, ChevronRight, UserCircle,
+  ClipboardList, Building2, Settings,
+  Receipt, Percent, Heart, Pill,
+  BarChart3, LogOut, ChevronRight, UserCircle,
 } from "lucide-react";
 import { authLogout } from "@/lib/um-api";
-import { clearSession, getCurrentUser } from "@/lib/auth";
+import { clearSession } from "@/lib/auth";
 import { useSettings } from "@/components/SettingsContext";
+import { isAdmin, hasRole, type NavItem } from "@/lib/rbac";
 
 const mainGroup = {
   label: "หลัก",
@@ -34,7 +35,6 @@ const managementGroup = {
     { href: "/suppliers", label: "ผู้จัดจำหน่าย", icon: Truck, roles: ["ADMIN", "SUPER"] as string[] },
     { href: "/receives", label: "รับสินค้า (GR)", icon: ClipboardList, roles: ["ADMIN", "SUPER"] as string[] },
     { href: "/promotions", label: "โปรโมชัน", icon: Percent, roles: ["ADMIN", "SUPER"] as string[] },
-    { href: "/stock-transfers", label: "โอนสต็อก", icon: ArrowLeftRight, roles: ["ADMIN", "SUPER"] as string[] },
   ],
 };
 
@@ -73,8 +73,6 @@ const accountGroup = {
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const currentUser = getCurrentUser();
-  const role = currentUser?.role ?? "USER";
   const { isFeatureEnabled } = useSettings();
 
   const navGroups = [
@@ -82,15 +80,13 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     managementGroup,
     pharmacyGroup,
     reportGroup,
-    ...(role === "ADMIN" || role === "SUPER" ? [adminGroup] : []),
+    ...(isAdmin() ? [adminGroup] : []),
     accountGroup,
   ].map((group) => ({
     ...group,
-    items: group.items.filter((item) => {
-      const feat = (item as { feature?: string }).feature;
-      if (feat && !isFeatureEnabled(feat)) return false;
-      const roles = (item as { roles?: string[] }).roles;
-      if (roles && !roles.includes(role)) return false;
+    items: group.items.filter((item: NavItem) => {
+      if (item.feature && !isFeatureEnabled(item.feature)) return false;
+      if (item.roles && !item.roles.some((r) => hasRole(r as import("@/types/um").Role))) return false;
       return true;
     }),
   })).filter((g) => g.items.length > 0);

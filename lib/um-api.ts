@@ -1,5 +1,5 @@
-import axios from "axios";
-import { getToken, setToken, clearSession } from "./auth";
+import { createApiClient } from "./api-factory";
+import { setToken } from "./auth";
 import type {
   LoginRequest,
   LoginResponse,
@@ -15,27 +15,9 @@ import type {
   MessageResponse,
 } from "@/types/um";
 
-const umApi = axios.create({
+const umApi = createApiClient({
   baseURL: process.env.NEXT_PUBLIC_UM_API_URL,
-  headers: { "Content-Type": "application/json" },
 });
-
-umApi.interceptors.request.use((config) => {
-  const token = getToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-umApi.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      clearSession();
-      if (typeof window !== "undefined") window.location.href = "/login";
-    }
-    return Promise.reject(err);
-  }
-);
 
 export const authLogin = (data: LoginRequest) =>
   umApi.post<LoginResponse>("/auth/login", data).then((r) => r.data);

@@ -3,15 +3,13 @@
 import { useState, useCallback, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Banknote, QrCode, Receipt, CreditCard, ChevronLeft, Plus, X, Delete } from "lucide-react";
+import { Banknote, QrCode, ChevronLeft, Delete } from "lucide-react";
 import type { OrderPayment } from "@/types/pos";
 import { fmt } from "../_utils";
 
 const PAYMENT_TYPES: { value: OrderPayment["type"]; label: string; icon: React.ReactNode }[] = [
     { value: "CASH", label: "เงินสด", icon: <Banknote className="h-5 w-5" /> },
-    { value: "CREDIT", label: "บัตรเครดิต", icon: <CreditCard className="h-5 w-5" /> },
     { value: "PROMPTPAY", label: "พร้อมเพย์", icon: <QrCode className="h-5 w-5" /> },
-    { value: "TRANSFER", label: "โอนเงิน", icon: <Receipt className="h-5 w-5" /> },
 ];
 
 const TYPE_LABEL: Record<string, string> = Object.fromEntries(PAYMENT_TYPES.map((t) => [t.value, t.label]));
@@ -150,7 +148,7 @@ export function PaymentDialog({
 
                         {/* Left: payment method list */}
                         <div className="space-y-2">
-                            <p className="text-xs text-muted-foreground px-1">สามารถแบ่งชำระได้หลายช่องทาง</p>
+                            <p className="text-xs text-muted-foreground px-1">เลือกช่องทางชำระ</p>
                             {PAYMENT_TYPES.map((pt) => {
                                 const active = activeRow?.type === pt.value;
                                 return (
@@ -174,38 +172,6 @@ export function PaymentDialog({
                                 );
                             })}
 
-                            <button
-                                onClick={handleAddRow}
-                                className="w-full rounded-xl border border-dashed px-3 py-2.5 flex items-center justify-center gap-2 text-xs text-muted-foreground hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                            >
-                                <Plus className="h-3.5 w-3.5" />เพิ่มช่องทางชำระ
-                            </button>
-
-                            {payments.length > 1 && (
-                                <div className="rounded-xl border bg-card p-2 space-y-1">
-                                    {payments.map((row, idx) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => switchRow(idx)}
-                                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                                                idx === activeIdx ? "bg-primary/10 ring-1 ring-primary" : "hover:bg-accent"
-                                            }`}
-                                        >
-                                            <span>{TYPE_LABEL[row.type]}</span>
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="tabular-nums font-medium">฿{fmt(row.amount)}</span>
-                                                <button
-                                                    aria-label="ลบ"
-                                                    className="rounded-sm text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                                                    onClick={(e) => { e.stopPropagation(); onRemoveRow(idx); if (activeIdx >= payments.length - 1) setActiveIdx(Math.max(0, payments.length - 2)); }}
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
                         </div>
 
                         {/* Right: keypad + confirm */}

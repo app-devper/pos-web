@@ -55,7 +55,7 @@ export function useCart(products: ProductDetail[]) {
 
     const activeTabRef = useRef(activeTab);
     const persistTabsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    activeTabRef.current = activeTab;
+    useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
     const setCart = useCallback((updater: CartItem[] | ((prev: CartItem[]) => CartItem[])) => {
         setTabs((prev) => prev.map((t, i) => i === activeTabRef.current ? { ...t, cart: typeof updater === "function" ? updater(t.cart) : updater } : t));
@@ -70,10 +70,11 @@ export function useCart(products: ProductDetail[]) {
         setTabs((prev) => prev.map((t, i) => i === activeTabRef.current ? { ...t, customerName: val } : t));
     }, []);
 
-    // Hydrate productRef
+    // Hydrate productRef from loaded products
     useEffect(() => {
         if (products.length === 0) return;
         const productById = new Map(products.map((p) => [p.id, p]));
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing external product data into cart state is intentional
         setTabs((prev) => prev.map((tab) => {
             const needsHydration = tab.cart.some((i) => !i.productRef);
             if (!needsHydration) return tab;
@@ -92,7 +93,8 @@ export function useCart(products: ProductDetail[]) {
         if (persistTabsTimeoutRef.current) clearTimeout(persistTabsTimeoutRef.current);
         persistTabsTimeoutRef.current = setTimeout(() => {
             try {
-                const toStore = tabs.map((t) => ({ ...t, cart: t.cart.map(({ productRef, ...rest }) => rest) }));
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const toStore = tabs.map((t) => ({ ...t, cart: t.cart.map(({ productRef: _ref, ...rest }) => rest) }));
                 sessionStorage.setItem("sale_tabs", JSON.stringify(toStore));
             } catch { }
         }, SALE_TABS_STORAGE_DEBOUNCE_MS);
@@ -150,9 +152,11 @@ export function useCart(products: ProductDetail[]) {
     const addTab = useCallback(() => {
         setTabs((prev) => {
             if (prev.length >= MAX_TABS) return prev;
-            return [...prev, { ...EMPTY_TAB }];
+            const newTabs = [...prev, { ...EMPTY_TAB }];
+            // Set active tab to the new tab index after state update
+            setTimeout(() => setActiveTab(newTabs.length - 1), 0);
+            return newTabs;
         });
-        setActiveTab((prev) => prev + 1);
     }, []);
 
     const removeTab = useCallback((idx: number) => {

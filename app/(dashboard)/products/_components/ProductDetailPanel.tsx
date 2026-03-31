@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, ArrowUpDown, ChevronUp, ChevronDown, History, ListOrdered, ChevronLeft } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, History, ListOrdered, ChevronLeft } from "lucide-react";
 import { useProductDetail } from "./ProductDetailContext";
 import UnitDialog from "./UnitDialog";
 import StockDialog from "./StockDialog";

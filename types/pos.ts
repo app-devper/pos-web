@@ -201,7 +201,7 @@ export interface OrderItem {
 }
 
 export interface OrderPayment {
-  type: "CASH" | "CREDIT" | "PROMPTPAY" | "TRANSFER";
+  type: "CASH" | "PROMPTPAY";
   amount: number;
 }
 
@@ -238,12 +238,13 @@ export interface CreateOrderRequest {
   customerName?: string;
   patientId?: string;
   pharmacistName?: string;
+  licenseNo?: string;
   prescriberName?: string;
   buyerName?: string;
   buyerIdCard?: string;
   items: OrderItem[];
   payments: OrderPayment[];
-  type: "CASH" | "CREDIT" | "PROMPTPAY" | "TRANSFER";
+  type: "CASH" | "PROMPTPAY";
   amount: number;
   total: number;
   discount?: number;
@@ -255,11 +256,15 @@ export interface CreateOrderRequest {
 export interface Category {
   id: string;
   name: string;
+  value: string;
+  default?: boolean;
   isDefault?: boolean;
+  createdDate?: string;
 }
 
 export interface CategoryRequest {
   name: string;
+  value: string;
 }
 
 // ─── Customer ─────────────────────────────────────────────
@@ -600,7 +605,13 @@ export interface PharmacyReportItem {
   genericName?: string;
   lotNumber?: string;
   quantity: number;
+  unit?: string;
   costPrice?: number;
+  supplierName?: string;
+  expireDate?: string;
+  strength?: string;
+  dosageForm?: string;
+  dosage?: string;
   pharmacistName?: string;
   licenseNo?: string;
   drugType?: string;

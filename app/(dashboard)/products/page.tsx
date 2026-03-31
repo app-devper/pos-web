@@ -12,13 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Search, Plus, ArrowUpDown, X, Package, RefreshCw, ChevronLeft, Upload, Download, Barcode, Tag, Sticker, FileSpreadsheet, ArrowRightLeft } from "lucide-react";
 import { createProduct, updateProduct, deleteProduct, listCategories, createProductUnit, createProductPrice, importProductsCsv, downloadReport, downloadBarcodePdf } from "@/lib/pos-api";
 import { useProductCache } from "@/components/ProductCacheContext";
-import type { ProductDetail, CreateProductRequest, Category, CSVImportResult } from "@/types/pos";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { CsvImportDialog } from "./_components/CsvImportDialog";
 import ProductDetailPanel from "./_components/ProductDetailPanel";
 import { ProductDetailProvider } from "./_components/ProductDetailContext";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { printPriceListReport, printPriceTagsReport } from "@/lib/report-print";
-
+import type { ProductDetail, CreateProductRequest, Category } from "@/types/pos";
 
 const DRUG_REGISTRATIONS = [
   { value: "KHY9", label: "บัญชี ข.ย.9", desc: "บัญชีการซื้อยา" },
@@ -66,15 +66,15 @@ export default function ProductsPage() {
   const [saving, setSaving] = useState(false);
 
   const [csvOpen, setCsvOpen] = useState(false);
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvUploading, setCsvUploading] = useState(false);
-  const [csvResult, setCsvResult] = useState<CSVImportResult | null>(null);
   const confirm = useConfirm();
 
   useEffect(() => {
     listCategories()
       .then((c) => setCategories(Array.isArray(c) ? c : []))
-      .catch(() => {});
+      .catch((err) => {
+        toast.error("ไม่สามารถโหลดหมวดหมู่สินค้าได้");
+        console.error("Failed to load categories:", err);
+      });
   }, []);
 
   useEffect(() => {
@@ -96,13 +96,15 @@ export default function ProductsPage() {
 
   function openCreate() {
     setEditing(null);
-    setForm(EMPTY);
+    const defaultCat = categories.find((c) => c.isDefault)?.name ?? categories[0]?.name ?? "";
+    setForm({ ...EMPTY, category: defaultCat });
     setUnitForm(EMPTY_UNIT);
     setFormOpen(true);
   }
   function openEdit(p: ProductDetail) {
     setEditing(p);
-    setForm({ name: p.name, nameEn: p.nameEn ?? "", description: p.description ?? "", price: p.price, costPrice: p.costPrice, unit: p.unit, serialNumber: p.serialNumber, category: p.category ?? "", status: p.status ?? "ACTIVE", minStock: p.minStock ?? 0, drugRegistrations: p.drugRegistrations ?? [], drugInfo: p.drugInfo ?? undefined });
+    const defaultCat = categories.find((c) => c.isDefault)?.name ?? categories[0]?.name ?? "";
+    setForm({ name: p.name, nameEn: p.nameEn ?? "", description: p.description ?? "", price: p.price, costPrice: p.costPrice, unit: p.unit, serialNumber: p.serialNumber, category: p.category || defaultCat, status: p.status || "ACTIVE", minStock: p.minStock ?? 0, drugRegistrations: p.drugRegistrations ?? [], drugInfo: p.drugInfo ?? undefined });
     setFormOpen(true);
   }
   function closeForm() {
@@ -409,7 +411,7 @@ export default function ProductsPage() {
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><Plus className="h-4 w-4" /></div>
                     <div className="min-w-0"><p className="text-sm font-medium">เพิ่มสินค้า</p><p className="text-xs text-muted-foreground truncate">สร้างรายการใหม่</p></div>
                   </button>
-                  <button onClick={() => { setCsvOpen(true); setCsvFile(null); setCsvResult(null); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                  <button onClick={() => setCsvOpen(true)} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-orange-500/10 text-orange-600"><Upload className="h-4 w-4" /></div>
                     <div className="min-w-0"><p className="text-sm font-medium">นำเข้า CSV</p><p className="text-xs text-muted-foreground truncate">นำเข้าสินค้าจากไฟล์</p></div>
                   </button>
@@ -467,52 +469,11 @@ export default function ProductsPage() {
       </div>
 
       {/* CSV Import Dialog */}
-      <Dialog open={csvOpen} onOpenChange={setCsvOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>นำเข้าสินค้าจาก CSV</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label>เลือกไฟล์ CSV</Label>
-              <Input type="file" accept=".csv" onChange={(e) => { setCsvFile(e.target.files?.[0] ?? null); setCsvResult(null); }} />
-              {csvFile && <p className="text-xs text-muted-foreground">{csvFile.name} ({(csvFile.size / 1024).toFixed(1)} KB)</p>}
-            </div>
-            {csvUploading && (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
-                <span className="text-sm text-muted-foreground">กำลังอัปโหลด…</span>
-              </div>
-            )}
-            {csvResult && (
-              <div className="rounded border p-3 space-y-1 text-sm">
-                <p className="font-medium">ผลการนำเข้า</p>
-                <p className="text-green-600">สำเร็จ: {csvResult.success} รายการ</p>
-                {(csvResult.failed ?? 0) > 0 && <p className="text-destructive">ล้มเหลว: {csvResult.failed} รายการ</p>}
-                {csvResult.errors && csvResult.errors.length > 0 && (
-                  <div className="max-h-32 overflow-y-auto text-xs text-destructive space-y-0.5 mt-1">
-                    {csvResult.errors.map((err, i) => <p key={i}>{err}</p>)}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCsvOpen(false)}>ปิด</Button>
-            <Button disabled={!csvFile || csvUploading} onClick={async () => {
-              if (!csvFile) return;
-              setCsvUploading(true);
-              setCsvResult(null);
-              try {
-                const res = await importProductsCsv(csvFile);
-                setCsvResult(res);
-                if (res.success > 0) { toast.success(`นำเข้าสำเร็จ ${res.success} รายการ`); refresh(); }
-              } catch { toast.error("นำเข้าไม่สำเร็จ"); }
-              finally { setCsvUploading(false); }
-            }}>
-              <Upload className="h-4 w-4 mr-2" />อัปโหลด
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CsvImportDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        onSuccess={refresh}
+      />
     </div>
   );
 }

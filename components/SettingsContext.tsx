@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useReducer, type ReactNode } from "react";
+import { toast } from "sonner";
 import { getSetting } from "@/lib/pos-api";
 import type { Setting } from "@/types/pos";
 
@@ -18,24 +19,50 @@ const SettingsContext = createContext<SettingsContextValue>({
   isFeatureEnabled: () => false,
 });
 
-export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [setting, setSetting] = useState<Setting | null>(null);
-  const [loading, setLoading] = useState(true);
+type State = { setting: Setting | null; loading: boolean };
+type Action = { type: "loading" } | { type: "loaded"; setting: Setting } | { type: "error" };
 
-  const load = () => {
-    setLoading(true);
+function reducer(_state: State, action: Action): State {
+  switch (action.type) {
+    case "loading": return { setting: _state.setting, loading: true };
+    case "loaded": return { setting: action.setting, loading: false };
+    case "error": return { setting: _state.setting, loading: false };
+  }
+}
+
+export function SettingsProvider({ children }: { children: ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, { setting: null, loading: true });
+
+  useEffect(() => {
+    let cancelled = false;
+    dispatch({ type: "loading" });
     getSetting()
-      .then(setSetting)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then((s) => { if (!cancelled) dispatch({ type: "loaded", setting: s }); })
+      .catch((err) => {
+        if (!cancelled) {
+          dispatch({ type: "error" });
+          toast.error("ไม่สามารถโหลดการตั้งค่าได้");
+          console.error("Failed to load settings:", err);
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const reload = () => {
+    dispatch({ type: "loading" });
+    getSetting()
+      .then((s) => dispatch({ type: "loaded", setting: s }))
+      .catch((err) => {
+        dispatch({ type: "error" });
+        toast.error("ไม่สามารถโหลดการตั้งค่าได้");
+        console.error("Failed to reload settings:", err);
+      });
   };
 
-  useEffect(() => { load(); }, []);
-
-  const isFeatureEnabled = (key: string) => setting?.features?.[key] ?? false;
+  const isFeatureEnabled = (key: string) => state.setting?.features?.[key] ?? false;
 
   return (
-    <SettingsContext.Provider value={{ setting, loading, reload: load, isFeatureEnabled }}>
+    <SettingsContext.Provider value={{ setting: state.setting, loading: state.loading, reload, isFeatureEnabled }}>
       {children}
     </SettingsContext.Provider>
   );

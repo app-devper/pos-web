@@ -1,4 +1,4 @@
-import type { Branch, Customer, Order, OrderDetail, PharmacyReportResponse, Product, ProductHistory, Receive, Setting } from "@/types/pos";
+import type { Branch, Customer, Order, OrderDetail, PharmacyReportItem, PharmacyReportResponse, Product, ProductHistory, Receive, Setting } from "@/types/pos";
 
 const PAYMENT_LABEL: Record<string, string> = {
   CASH: "เงินสด",
@@ -465,40 +465,123 @@ export function printPharmacyReport(params: {
 }) {
   const { report, setting } = params;
   const isPurchase = report.key === "khy9";
+
+  const KHY_TITLE: Record<string, string> = {
+    khy9: "ข.ย.9 บัญชีการซื้อยา",
+    khy10: "ข.ย.10 บัญชีการขายยาควบคุมพิเศษ",
+    khy11: "ข.ย.11 บัญชีการขายยาอันตราย",
+    khy12: "ข.ย.12 บัญชีการขายยาตามใบสั่งของผู้ประกอบวิชาชีพ",
+    khy13: "ข.ย.13 รายงานการขายยาตามที่เลขาธิการ อย. กำหนด",
+  };
+  const formTitle = KHY_TITLE[report.key] || report.title;
+
+  const totalQty = report.items.reduce((s, i) => s + i.quantity, 0);
+  const totalCost = isPurchase ? report.items.reduce((s, i) => s + (i.costPrice ?? 0), 0) : 0;
+
+  const purchaseHead = `
+    <tr>
+      <th class="text-center" style="width:36px">ลำดับ</th>
+      <th>วันที่ซื้อ</th>
+      <th>เลขที่ใบรับ</th>
+      <th>ชื่อยา</th>
+      <th>ชื่อสามัญ</th>
+      <th>ความแรง</th>
+      <th>ล็อต</th>
+      <th>วันหมดอายุ</th>
+      <th class="text-right">จำนวน</th>
+      <th>หน่วย</th>
+      <th class="text-right">ต้นทุน</th>
+      <th>ผู้จำหน่าย</th>
+    </tr>`;
+
+  const dispensingHead = `
+    <tr>
+      <th class="text-center" style="width:36px">ลำดับ</th>
+      <th>วันที่ขาย</th>
+      <th>ชื่อยา</th>
+      <th>ชื่อสามัญ</th>
+      <th>ความแรง</th>
+      <th>รูปแบบยา</th>
+      <th class="text-right">จำนวน</th>
+      <th>หน่วย</th>
+      <th>วิธีใช้</th>
+      <th>เภสัชกรผู้จ่ายยา</th>
+      <th>เลขใบอนุญาต</th>
+    </tr>`;
+
+  const colCount = isPurchase ? 12 : 11;
+
+  const purchaseRow = (item: PharmacyReportItem, idx: number) => `
+    <tr>
+      <td class="text-center">${idx + 1}</td>
+      <td>${escapeHtml(fmtDate(item.date))}</td>
+      <td>${escapeHtml(item.code || "-")}</td>
+      <td>${escapeHtml(item.productName)}</td>
+      <td>${escapeHtml(item.genericName || "-")}</td>
+      <td>${escapeHtml(item.strength || "-")}</td>
+      <td>${escapeHtml(item.lotNumber || "-")}</td>
+      <td>${escapeHtml(item.expireDate ? fmtDate(item.expireDate) : "-")}</td>
+      <td class="text-right">${escapeHtml(item.quantity)}</td>
+      <td>${escapeHtml(item.unit || "-")}</td>
+      <td class="text-right">฿${currency.format(item.costPrice ?? 0)}</td>
+      <td>${escapeHtml(item.supplierName || "-")}</td>
+    </tr>`;
+
+  const dispensingRow = (item: PharmacyReportItem, idx: number) => `
+    <tr>
+      <td class="text-center">${idx + 1}</td>
+      <td>${escapeHtml(fmtDate(item.date))}</td>
+      <td>${escapeHtml(item.productName)}</td>
+      <td>${escapeHtml(item.genericName || "-")}</td>
+      <td>${escapeHtml(item.strength || "-")}</td>
+      <td>${escapeHtml(item.dosageForm || "-")}</td>
+      <td class="text-right">${escapeHtml(item.quantity)}</td>
+      <td>${escapeHtml(item.unit || "-")}</td>
+      <td>${escapeHtml(item.dosage || "-")}</td>
+      <td>${escapeHtml(item.pharmacistName || "-")}</td>
+      <td>${escapeHtml(item.licenseNo || "-")}</td>
+    </tr>`;
+
   const body = `
     <div class="page">
-      ${renderHeader(report.title, setting, `ช่วงวันที่ ${fmtDate(report.startDate)} - ${fmtDate(report.endDate)}`)}
+      ${renderHeader(formTitle, setting, `ช่วงวันที่ ${fmtDate(report.startDate)} - ${fmtDate(report.endDate)}`)}
       <div class="meta">
-        <div class="meta-card"><div class="meta-label">ประเภทแบบฟอร์ม</div><div class="meta-value">${escapeHtml(report.key.toUpperCase())}</div></div>
-        <div class="meta-card"><div class="meta-label">จำนวนรายการ</div><div class="meta-value">${report.items.length}</div></div>
+        <div class="meta-card"><div class="meta-label">แบบฟอร์ม</div><div class="meta-value">${escapeHtml(formTitle)}</div></div>
+        <div class="meta-card"><div class="meta-label">จำนวนรายการ</div><div class="meta-value">${report.items.length} รายการ</div></div>
+        ${isPurchase ? `<div class="meta-card"><div class="meta-label">มูลค่ารวม</div><div class="meta-value">฿${currency.format(totalCost)}</div></div>` : ""}
+        <div class="meta-card"><div class="meta-label">จำนวนรวม</div><div class="meta-value">${totalQty}</div></div>
       </div>
       <div class="section">
         <table>
-          <thead>
-            <tr>
-              <th>วันที่</th>
-              ${isPurchase ? "<th>เลขที่</th>" : ""}
-              <th>ชื่อยา</th>
-              ${isPurchase ? "" : "<th>ชื่อสามัญ</th>"}
-              ${isPurchase ? "<th>ล็อต</th>" : ""}
-              <th class="text-right">จำนวน</th>
-              ${isPurchase ? "<th class=\"text-right\">ต้นทุน</th>" : "<th>เภสัชกร</th><th>เลขใบอนุญาต</th>"}
-            </tr>
-          </thead>
+          <thead>${isPurchase ? purchaseHead : dispensingHead}</thead>
           <tbody>
-            ${report.items.length === 0 ? `<tr><td colspan="${isPurchase ? 6 : 6}" class="text-center muted">ไม่พบข้อมูล</td></tr>` : report.items.map((item) => `
-              <tr>
-                <td>${escapeHtml(fmtDate(item.date))}</td>
-                ${isPurchase ? `<td>${escapeHtml(item.code || "-")}</td>` : ""}
-                <td>${escapeHtml(item.productName)}</td>
-                ${isPurchase ? "" : `<td>${escapeHtml(item.genericName || "-")}</td>`}
-                ${isPurchase ? `<td>${escapeHtml(item.lotNumber || "-")}</td>` : ""}
-                <td class="text-right">${escapeHtml(item.quantity)}</td>
-                ${isPurchase ? `<td class="text-right">฿${currency.format(item.costPrice ?? 0)}</td>` : `<td>${escapeHtml(item.pharmacistName || "-")}</td><td>${escapeHtml(item.licenseNo || "-")}</td>`}
-              </tr>
-            `).join("")}
+            ${report.items.length === 0
+              ? `<tr><td colspan="${colCount}" class="text-center muted">ไม่พบข้อมูล</td></tr>`
+              : report.items.map((item, idx) => isPurchase ? purchaseRow(item, idx) : dispensingRow(item, idx)).join("")}
           </tbody>
         </table>
+      </div>
+      ${isPurchase ? `
+        <div class="totals">
+          <div class="totals-row"><span>จำนวนรายการ</span><span>${report.items.length}</span></div>
+          <div class="totals-row"><span>จำนวนรวม</span><span>${totalQty}</span></div>
+          <div class="totals-row total"><span>มูลค่าต้นทุนรวม</span><span>฿${currency.format(totalCost)}</span></div>
+        </div>
+      ` : `
+        <div class="totals">
+          <div class="totals-row"><span>จำนวนรายการ</span><span>${report.items.length}</span></div>
+          <div class="totals-row total"><span>จำนวนรวม</span><span>${totalQty}</span></div>
+        </div>
+      `}
+      <div style="margin-top:48px;display:flex;justify-content:space-between;gap:32px;">
+        <div style="text-align:center;flex:1;">
+          <div style="border-top:1px solid #d1d5db;padding-top:8px;font-size:12px;">ผู้จัดทำรายงาน</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:4px;">วันที่ ............/............/............</div>
+        </div>
+        <div style="text-align:center;flex:1;">
+          <div style="border-top:1px solid #d1d5db;padding-top:8px;font-size:12px;">เภสัชกรผู้มีหน้าที่ปฏิบัติการ</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:4px;">วันที่ ............/............/............</div>
+        </div>
       </div>
     </div>
   `;

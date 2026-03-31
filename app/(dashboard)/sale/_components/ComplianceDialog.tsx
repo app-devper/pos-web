@@ -11,6 +11,8 @@ export function ComplianceDialog({
     onOpenChange,
     pharmacist,
     onPharmacistChange,
+    licenseNo,
+    onLicenseNoChange,
     doctor,
     onDoctorChange,
     buyerName,
@@ -23,6 +25,8 @@ export function ComplianceDialog({
     onOpenChange: (v: boolean) => void;
     pharmacist: string;
     onPharmacistChange: (v: string) => void;
+    licenseNo: string;
+    onLicenseNoChange: (v: string) => void;
     doctor: string;
     onDoctorChange: (v: string) => void;
     buyerName: string;
@@ -44,6 +48,10 @@ export function ComplianceDialog({
                     <div className="space-y-1">
                         <Label>ชื่อเภสัชกรผู้จ่ายยา *</Label>
                         <Input value={pharmacist} onChange={(e) => onPharmacistChange(e.target.value)} placeholder="ภก./ภญ. ..." />
+                    </div>
+                    <div className="space-y-1">
+                        <Label>เลขใบอนุญาต *</Label>
+                        <Input value={licenseNo} onChange={(e) => onLicenseNoChange(e.target.value)} placeholder="เลขที่ใบอนุญาตเภสัชกร" />
                     </div>
                     <div className="space-y-1">
                         <Label>ชื่อผู้สั่งจ่าย (ถ้ามี)</Label>

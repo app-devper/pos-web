@@ -20,6 +20,7 @@ export default function CategoriesPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [name, setName] = useState("");
+  const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
 
@@ -33,15 +34,17 @@ export default function CategoriesPage() {
 
   useEffect(() => { load(); }, []);
 
-  function openCreate() { setEditing(null); setName(""); setOpen(true); }
-  function openEdit(c: Category) { setEditing(c); setName(c.name); setOpen(true); }
+  function openCreate() { setEditing(null); setName(""); setValue(""); setOpen(true); }
+  function openEdit(c: Category) { setEditing(c); setName(c.name); setValue(c.value ?? ""); setOpen(true); }
 
   async function handleSave() {
     if (!name.trim()) return toast.error("กรุณากรอกชื่อหมวดหมู่");
+    const val = value.trim() || name.trim();
+    const payload = { name: name.trim(), value: val };
     setSaving(true);
     try {
-      if (editing) await updateCategory(editing.id, { name });
-      else await createCategory({ name });
+      if (editing) await updateCategory(editing.id, payload);
+      else await createCategory(payload);
       toast.success(editing ? "อัปเดตแล้ว" : "สร้างแล้ว");
       setOpen(false);
       load();
@@ -76,16 +79,18 @@ export default function CategoriesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>ชื่อหมวดหมู่</TableHead>
+                  <TableHead>รหัส</TableHead>
                   <TableHead>ค่าเริ่มต้น</TableHead>
                   <TableHead className="w-28" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">ไม่มีข้อมูล</TableCell></TableRow>}
+                {items.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">ไม่มีข้อมูล</TableCell></TableRow>}
                 {items.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell>{c.isDefault && <Badge>ค่าเริ่มต้น</Badge>}</TableCell>
+                    <TableCell className="text-muted-foreground">{c.value}</TableCell>
+                    <TableCell>{(c.isDefault || c.default) && <Badge>ค่าเริ่มต้น</Badge>}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         {!c.isDefault && <Button size="icon" variant="ghost" title="ตั้งเป็นค่าเริ่มต้น" aria-label="ตั้งเป็นค่าเริ่มต้น" onClick={() => handleSetDefault(c.id)}><Star className="h-4 w-4" /></Button>}
@@ -103,11 +108,17 @@ export default function CategoriesPage() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{editing ? "แก้ไขหมวดหมู่" : "เพิ่มหมวดหมู่"}</DialogTitle></DialogHeader>
-          <div className="space-y-2">
-            <Label>ชื่อหมวดหมู่</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSave()} autoFocus />
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>ชื่อหมวดหมู่ *</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            </div>
+            <div className="space-y-1">
+              <Label>รหัส (value)</Label>
+              <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={name || "จะใช้ชื่อหมวดหมู่ถ้าไม่ระบุ"} />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>

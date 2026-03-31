@@ -1,5 +1,5 @@
-import axios from "axios";
-import { getToken, getPosHost, clearSession } from "./auth";
+import { createApiClient } from "./api-factory";
+import { getPosHost } from "./auth";
 import type {
   ProductDetail,
   Product,
@@ -56,34 +56,12 @@ import type {
   ProductReceiveRequest,
 } from "@/types/pos";
 
-function createPosAxios() {
-  const instance = axios.create({
-    headers: { "Content-Type": "application/json" },
-  });
-
-  instance.interceptors.request.use((config) => {
-    const token = getToken();
+const posApi = createApiClient({
+  baseURL: () => {
     const host = getPosHost();
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    if (host) config.baseURL = `${host}/api/pos/v1`;
-    return config;
-  });
-
-  instance.interceptors.response.use(
-    (res) => res,
-    (err) => {
-      if (err.response?.status === 401) {
-        clearSession();
-        if (typeof window !== "undefined") window.location.href = "/login";
-      }
-      return Promise.reject(err);
-    }
-  );
-
-  return instance;
-}
-
-const posApi = createPosAxios();
+    return host ? `${host}/api/pos/v1` : "";
+  },
+});
 
 // ─── Products ────────────────────────────────────────────────
 export const listProducts = (category?: string) =>
@@ -464,22 +442,17 @@ export const rejectStockTransfer = (id: string) =>
 // ─── Reports ──────────────────────────────────────────────────
 export const getReportUrl = (path: string, params?: Record<string, string | number>) => {
   const host = getPosHost();
-  const token = getToken();
   const base = `${host}/api/pos/v1${path}`;
   const qp = new URLSearchParams();
   if (params) Object.entries(params).forEach(([k, v]) => qp.set(k, String(v)));
-  if (token) qp.set("token", token);
   const qs = qp.toString();
   return qs ? `${base}?${qs}` : base;
 };
 
 export const downloadReport = async (path: string, params?: Record<string, string | number>, filename = "report") => {
-  const token = getToken();
-  const host = getPosHost();
-  const response = await axios.get(`${host}/api/pos/v1${path}`, {
+  const response = await posApi.get(path, {
     params,
     responseType: "blob",
-    headers: { Authorization: `Bearer ${token}` },
   });
   const url = URL.createObjectURL(response.data);
   const a = document.createElement("a");
@@ -493,11 +466,8 @@ export const getPharmacyReportData = (key: "khy9" | "khy10" | "khy11" | "khy12" 
   posApi.get<PharmacyReportResponse>(`/reports/pharmacy/${key}/data`, { params }).then((r) => r.data);
 
 export const downloadBarcodePdf = async (data: BarcodeRequest) => {
-  const token = getToken();
-  const host = getPosHost();
-  const response = await axios.post(`${host}/api/pos/v1/reports/barcodes/pdf`, data, {
+  const response = await posApi.post("/reports/barcodes/pdf", data, {
     responseType: "blob",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
   const url = URL.createObjectURL(response.data);
   const a = document.createElement("a");
