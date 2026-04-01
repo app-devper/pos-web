@@ -33,7 +33,7 @@ export const downloadReport = async (path: string, params?: Record<string, strin
     params,
     responseType: "blob",
   });
-  downloadBlob(response as unknown as Blob, filename);
+  downloadBlob(response.data as Blob, filename);
 };
 
 export const getPharmacyReportData = (key: "khy9" | "khy10" | "khy11" | "khy12" | "khy13", params: { startDate: string; endDate: string }): Promise<PharmacyReportResponse> =>
@@ -43,5 +43,5 @@ export const downloadBarcodePdf = async (data: BarcodeRequest) => {
   const response = await posApi.post<Blob>("/reports/barcodes/pdf", data, {
     responseType: "blob",
   });
-  downloadBlob(response as unknown as Blob, "barcodes.pdf");
+  downloadBlob(response.data as Blob, "barcodes.pdf");
 };
