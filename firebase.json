@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "devper-pharma",
+    "site": "pos-pharm",
     "public": "out",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [

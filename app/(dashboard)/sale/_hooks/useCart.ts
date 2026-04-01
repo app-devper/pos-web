@@ -32,7 +32,9 @@ function loadTabs(): CartTab[] {
             const parsed = JSON.parse(s);
             if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
-    } catch { }
+    } catch (e) {
+        console.error("Failed to load sale_tabs from sessionStorage:", e);
+    }
     return [{ ...EMPTY_TAB }];
 }
 
@@ -96,7 +98,9 @@ export function useCart(products: ProductDetail[]) {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const toStore = tabs.map((t) => ({ ...t, cart: t.cart.map(({ productRef: _ref, ...rest }) => rest) }));
                 sessionStorage.setItem("sale_tabs", JSON.stringify(toStore));
-            } catch { }
+            } catch (e) {
+                console.error("Failed to persist sale_tabs to sessionStorage:", e);
+            }
         }, SALE_TABS_STORAGE_DEBOUNCE_MS);
 
         return () => {
@@ -108,7 +112,9 @@ export function useCart(products: ProductDetail[]) {
     }, [tabs]);
 
     useEffect(() => {
-        try { sessionStorage.setItem("sale_activeTab", String(activeTab)); } catch { }
+        try { sessionStorage.setItem("sale_activeTab", String(activeTab)); } catch (e) {
+            console.error("Failed to persist active tab:", e);
+        }
     }, [activeTab]);
 
     const addToCart = useCallback((p: ProductDetail) => {
@@ -152,10 +158,11 @@ export function useCart(products: ProductDetail[]) {
     const addTab = useCallback(() => {
         setTabs((prev) => {
             if (prev.length >= MAX_TABS) return prev;
-            const newTabs = [...prev, { ...EMPTY_TAB }];
-            // Set active tab to the new tab index after state update
-            setTimeout(() => setActiveTab(newTabs.length - 1), 0);
-            return newTabs;
+            return [...prev, { ...EMPTY_TAB }];
+        });
+        setTabs((prev) => {
+            setActiveTab(prev.length - 1);
+            return prev;
         });
     }, []);
 

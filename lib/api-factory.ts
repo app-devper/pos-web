@@ -42,9 +42,14 @@ export function createApiClient(options: CreateApiOptions): AxiosInstance {
     });
   }
 
-  // Response interceptor for 401 handling
+  // Response interceptor for data extraction and 401 handling
   instance.interceptors.response.use(
-    (res) => res,
+    (res) => {
+      // If it's a blob/binary, return the whole response so caller can access headers if needed
+      // or just return the response if it's already structured
+      if (res.config.responseType === "blob") return res;
+      return res.data;
+    },
     (err) => {
       if (err.response?.status === 401) {
         clearSession();

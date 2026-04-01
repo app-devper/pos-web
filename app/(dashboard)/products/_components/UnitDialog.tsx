@@ -8,6 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { createProductUnit, updateProductUnit } from "@/lib/pos-api";
 import type { ProductUnit } from "@/types/pos";
+import { Combobox } from "@/components/ui/combobox";
+
+const UNIT_PRESETS = [
+  "เม็ด", "แคปซูล", "แผง", "กล่อง", "ขวด", "หลอด", "ซอง", "ถุง",
+  "กระปุก", "ชิ้น", "อัน", "ตัว", "คู่", "แพ็ค", "โหล", "ม้วน",
+];
 
 interface Props {
   open: boolean;
@@ -54,8 +60,13 @@ export default function UnitDialog({ open, onOpenChange, productId, editing, onS
         <DialogHeader><DialogTitle>{editing ? "แก้ไขหน่วยนับ" : "เพิ่มหน่วยนับ"}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2 space-y-1">
-            <Label>ชื่อหน่วย *</Label>
-            <Input value={form.unit} onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))} placeholder="เช่น กล่อง, แผ่น, ขวด" />
+            <Label>ชื่อหน่วย * <span className="text-xs text-muted-foreground font-normal">เลือกหรือพิมพ์เอง</span></Label>
+            <Combobox
+              value={form.unit}
+              onChange={(v) => setForm((f) => ({ ...f, unit: v }))}
+              options={UNIT_PRESETS}
+              placeholder="เลือกหรือพิมพ์หน่วยนับ"
+            />
           </div>
           <div className="space-y-1">
             <Label>ขนาดบรรจุ *</Label>

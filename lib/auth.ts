@@ -6,11 +6,12 @@ const USER_KEY = "pos_user_info";
 const COOKIE_TOKEN_KEY = "pos_token";
 
 function setCookie(name: string, value: string) {
-  document.cookie = `${name}=${value};path=/;max-age=86400`;
+  const isSecure = window.location.protocol === "https:";
+  document.cookie = `${name}=${value};path=/;max-age=86400;SameSite=Strict${isSecure ? ";Secure" : ""}`;
 }
 
 function removeCookie(name: string) {
-  document.cookie = `${name}=;path=/;max-age=0`;
+  document.cookie = `${name}=;path=/;max-age=0;SameSite=Strict`;
 }
 
 export function getToken(): string | null {

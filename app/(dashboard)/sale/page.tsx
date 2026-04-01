@@ -29,7 +29,7 @@ import { useCart, resolvePrice } from "./_hooks/useCart";
 import { useCompliance } from "./_hooks/useCompliance";
 import { usePromotion } from "./_hooks/usePromotion";
 import { usePayments } from "./_hooks/usePayments";
-import { fmt } from "./_utils";
+import { fmt, buildOrderItemStocks, resolveOrderItemCostPrice } from "./_utils";
 import type { CartItem } from "./_types";
 
 type ProductGridItem = {
@@ -126,41 +126,6 @@ export default function SalePage() {
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.quantity, 0), [cart]);
   const total = useMemo(() => Math.max(0, subtotal - discount - promo.promoDiscount), [subtotal, discount, promo.promoDiscount]);
 
-  const buildOrderItemStocks = useCallback((item: CartItem) => {
-    let remaining = item.quantity;
-    const prioritizedStocks = [...(item.stocks ?? [])].sort((a, b) => {
-      if (item.selectedStockId) {
-        if (a.stockId === item.selectedStockId) return -1;
-        if (b.stockId === item.selectedStockId) return 1;
-      }
-      return 0;
-    });
-
-    return prioritizedStocks
-      .map((stock) => {
-        if (remaining <= 0) return null;
-        const usedQty = Math.min(stock.quantity, remaining);
-        if (usedQty <= 0) return null;
-        remaining -= usedQty;
-        return { stockId: stock.stockId, quantity: usedQty };
-      })
-      .filter((stock): stock is { stockId: string; quantity: number } => Boolean(stock));
-  }, []);
-
-  const resolveOrderItemCostPrice = useCallback((item: CartItem) => {
-    const allocations = buildOrderItemStocks(item);
-    const stockMap = new Map((item.productRef?.stocks ?? []).map((stock) => [stock.id, stock]));
-
-    const totalAllocated = allocations.reduce((sum, stock) => sum + stock.quantity, 0);
-    if (totalAllocated <= 0) return item.costPrice ?? 0;
-
-    const totalCost = allocations.reduce((sum, allocation) => {
-      const stock = stockMap.get(allocation.stockId);
-      return sum + ((stock?.costPrice ?? item.costPrice ?? 0) * allocation.quantity);
-    }, 0);
-
-    return totalCost / totalAllocated;
-  }, [buildOrderItemStocks]);
 
   async function openPay() {
     if (cart.length === 0) return toast.error("ยังไม่มีสินค้าในตะกร้า");

@@ -19,6 +19,12 @@ import { ProductDetailProvider } from "./_components/ProductDetailContext";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { printPriceListReport, printPriceTagsReport } from "@/lib/report-print";
 import type { ProductDetail, CreateProductRequest, Category } from "@/types/pos";
+import { Combobox } from "@/components/ui/combobox";
+
+const UNIT_PRESETS = [
+  "เม็ด", "แคปซูล", "แผง", "กล่อง", "ขวด", "หลอด", "ซอง", "ถุง",
+  "กระปุก", "ชิ้น", "อัน", "ตัว", "คู่", "แพ็ค", "โหล", "ม้วน",
+];
 
 const DRUG_REGISTRATIONS = [
   { value: "KHY9", label: "บัญชี ข.ย.9", desc: "บัญชีการซื้อยา" },
@@ -45,9 +51,9 @@ const EMPTY: CreateProductRequest = {
   drugInfo: undefined,
 };
 
-interface UnitForm { unit: string; price: number; costPrice: number; barcode: string; sku: string; }
+interface UnitForm { unit: string; price: number; costPrice: number; barcode: string; sku: string; volume: number; volumeUnit: string; }
 
-const EMPTY_UNIT: UnitForm = { unit: "", price: 0, costPrice: 0, barcode: "", sku: "" };
+const EMPTY_UNIT: UnitForm = { unit: "", price: 0, costPrice: 0, barcode: "", sku: "", volume: 0, volumeUnit: "" };
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -128,7 +134,7 @@ export default function ProductsPage() {
         if (!form.serialNumber) return toast.error("กรุณากรอกรหัสสินค้า");
         const product = await createProduct(form);
         if (product?.id && unitForm.unit) {
-          const unit = await createProductUnit({ productId: product.id, unit: unitForm.unit, size: 1, costPrice: unitForm.costPrice || form.costPrice, price: unitForm.price, barcode: unitForm.barcode || undefined });
+          const unit = await createProductUnit({ productId: product.id, unit: unitForm.unit, size: 1, costPrice: unitForm.costPrice || form.costPrice, price: unitForm.price, barcode: unitForm.barcode || undefined, volume: unitForm.volume || undefined, volumeUnit: unitForm.volumeUnit || undefined });
           if (unit?.id && unitForm.price > 0) {
             await createProductPrice({ productId: product.id, unitId: unit.id, customerType: "General", price: unitForm.price });
           }
@@ -255,12 +261,6 @@ export default function ProductsPage() {
                     <Label>รหัสสินค้า *</Label>
                     <Input value={form.serialNumber} onChange={(e) => setForm((f) => ({ ...f, serialNumber: e.target.value }))} disabled={!!editing} />
                   </div>
-                  {!editing && (
-                    <div className="space-y-1">
-                      <Label>หน่วยหลัก *</Label>
-                      <Input value={form.unit} onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))} placeholder="เช่น กล่อง, แผ่น" />
-                    </div>
-                  )}
                   <div className="space-y-1">
                     <Label>หมวดหมู่</Label>
                     <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}>
@@ -298,8 +298,13 @@ export default function ProductsPage() {
                   <p className="text-xs text-muted-foreground mb-4">สร้างหน่วยนับแรกให้สินค้าอัตโนมัติ (ไม่บังคับ)</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="sm:col-span-2 space-y-1">
-                      <Label>ชื่อหน่วยนับ <span className="text-xs text-muted-foreground font-normal">ภาษาไทย, อังกฤษ และตัวเลข</span></Label>
-                      <Input value={unitForm.unit} onChange={(e) => setUnitForm((f) => ({ ...f, unit: e.target.value }))} placeholder="โปรดระบุหน่วยนับ" />
+                      <Label>หน่วยนับ * <span className="text-xs text-muted-foreground font-normal">เลือกหรือพิมพ์เอง</span></Label>
+                      <Combobox
+                        value={unitForm.unit}
+                        onChange={(v) => { setUnitForm((f) => ({ ...f, unit: v })); setForm((f) => ({ ...f, unit: v })); }}
+                        options={UNIT_PRESETS}
+                        placeholder="เลือกหรือพิมพ์หน่วยนับ"
+                      />
                     </div>
                     <div className="space-y-1">
                       <Label>ราคาขายต่อหน่วย <span className="text-xs text-muted-foreground font-normal">ค่าเริ่มต้น</span></Label>
@@ -316,6 +321,14 @@ export default function ProductsPage() {
                     <div className="space-y-1">
                       <Label>SKU <span className="text-xs text-muted-foreground font-normal">รหัสสินค้า</span></Label>
                       <Input value={unitForm.sku} onChange={(e) => setUnitForm((f) => ({ ...f, sku: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>ปริมาณ <span className="text-xs text-muted-foreground font-normal">เช่น 100</span></Label>
+                      <Input type="number" min={0} value={unitForm.volume === 0 ? "" : unitForm.volume} onChange={(e) => setUnitForm((f) => ({ ...f, volume: +e.target.value }))} className={NUM_CLS} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>หน่วยปริมาณ <span className="text-xs text-muted-foreground font-normal">เช่น ml, mg</span></Label>
+                      <Input value={unitForm.volumeUnit} onChange={(e) => setUnitForm((f) => ({ ...f, volumeUnit: e.target.value }))} placeholder="ml, mg, g" />
                     </div>
                   </div>
 
