@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance, type AxiosRequestConfig } from "axios";
+import axios, { type AxiosInstance } from "axios";
 import { getToken, clearSession } from "./auth";
 
 interface CreateApiOptions {
@@ -16,31 +16,35 @@ export function createApiClient(options: CreateApiOptions): AxiosInstance {
     headers: { "Content-Type": "application/json" },
   });
 
-  // Request interceptor for auth headers
-  if (options.withAuth !== false) {
-    instance.interceptors.request.use((config) => {
+  const resolveBaseUrl = () => {
+    if (!options.baseURL) {
+      throw new Error("API base URL is not configured");
+    }
+
+    const baseUrl = typeof options.baseURL === "function"
+      ? options.baseURL()
+      : options.baseURL;
+
+    if (!baseUrl) {
+      throw new Error("API base URL is not configured");
+    }
+
+    return baseUrl;
+  };
+
+  instance.interceptors.request.use((config) => {
+    config.baseURL = resolveBaseUrl();
+
+    // Inject auth only for clients that need it.
+    if (options.withAuth !== false) {
       const token = getToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+    }
 
-      // Handle dynamic baseURL
-      if (options.baseURL) {
-        const baseUrl = typeof options.baseURL === "function" 
-          ? options.baseURL() 
-          : options.baseURL;
-        if (baseUrl) {
-          config.baseURL = baseUrl;
-        } else {
-          throw new Error("API base URL is not configured");
-        }
-      } else {
-        throw new Error("API base URL is not configured");
-      }
-
-      return config;
-    });
-  }
+    return config;
+  });
 
   // Response interceptor for data extraction and 401 handling
   instance.interceptors.response.use(
@@ -51,7 +55,10 @@ export function createApiClient(options: CreateApiOptions): AxiosInstance {
       return res.data;
     },
     (err) => {
-      if (err.response?.status === 401) {
+      const requestUrl = String(err.config?.url ?? "");
+      const shouldHandleUnauthorized = err.response?.status === 401 && requestUrl !== "/auth/login";
+
+      if (shouldHandleUnauthorized) {
         clearSession();
         const onUnauthorized = options.onUnauthorized ?? (() => {
           if (typeof window !== "undefined") {

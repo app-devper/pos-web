@@ -6,24 +6,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { downloadReport, getOrder, getOrdersByCustomer, getPharmacyReportData, getProduct, getProductHistories, getReportUrl, getSetting, listBranches, listCustomers, listOrders, listProducts, listReceives } from "@/lib/pos-api";
+import { downloadReport, getOrder, getOrdersByCustomer, getPharmacyReportData, getProduct, getProductHistories, getSetting, listBranches, listCustomers, listOrders, listProducts, listReceives } from "@/lib/pos-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
 import { FileDown, FileText, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { printCustomerHistoryReport, printPharmacyReport, printPriceListReport, printPriceTagsReport, printProductHistoryReport, printReceiptDocument, printReceivesSummaryReport, printSalesReport } from "@/lib/report-print";
 
-export default function ReportsPage() {
-  const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().split("T")[0]; });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
+function formatLocalDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toDayRange(date: string, boundary: "start" | "end") {
+  return `${date}T${boundary === "start" ? "00:00:00.000" : "23:59:59.999"}`;
+}
+
+function ReportsPage() {
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return formatLocalDateInput(d);
+  });
+  const [endDate, setEndDate] = useState(() => formatLocalDateInput(new Date()));
   const [orderId, setOrderId] = useState("");
   const [productId, setProductId] = useState("");
   const [customerCode, setCustomerCode] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-  const preview = (path: string, params?: Record<string, string | number>) => {
-    const url = getReportUrl(path, params);
-    setPreviewUrl(url);
-  };
 
   const dl = async (key: string, path: string, params?: Record<string, string | number>, filename?: string) => {
     setLoading(key);
@@ -38,8 +49,8 @@ export default function ReportsPage() {
     const key = "sales-pdf";
     setLoading(key);
     try {
-      const from = new Date(startDate).toISOString();
-      const to = new Date(endDate + "T23:59:59").toISOString();
+      const from = toDayRange(startDate, "start");
+      const to = toDayRange(endDate, "end");
       const [orders, setting, branches] = await Promise.all([
         listOrders(from, to),
         getSetting().catch(() => undefined),
@@ -64,11 +75,21 @@ export default function ReportsPage() {
         listCustomers().catch(() => []),
         getSetting().catch(() => undefined),
       ]);
+      const orderList = Array.isArray(orders) ? orders : [];
+      const detailedOrders = await Promise.all(
+        orderList.map(async (order) => {
+          try {
+            return await getOrder(order.id);
+          } catch {
+            return order;
+          }
+        })
+      );
       const customer = Array.isArray(customers) ? customers.find((item) => item.code === customerCode) : undefined;
       printCustomerHistoryReport({
         customerCode,
         customer,
-        orders: Array.isArray(orders) ? orders : [],
+        orders: detailedOrders,
         setting,
       });
       toast.success("เปิดเอกสารสำหรับบันทึกเป็น PDF แล้ว");
@@ -109,8 +130,8 @@ export default function ReportsPage() {
     const key = "receives-pdf";
     setLoading(key);
     try {
-      const from = new Date(startDate).toISOString();
-      const to = new Date(endDate + "T23:59:59").toISOString();
+      const from = toDayRange(startDate, "start");
+      const to = toDayRange(endDate, "end");
       const [receives, setting] = await Promise.all([
         listReceives(from, to),
         getSetting().catch(() => undefined),
@@ -175,8 +196,8 @@ export default function ReportsPage() {
     setLoading(key);
     try {
       const dateParams = {
-        startDate: new Date(startDate).toISOString(),
-        endDate: new Date(endDate + "T23:59:59").toISOString(),
+        startDate: toDayRange(startDate, "start"),
+        endDate: toDayRange(endDate, "end"),
       };
       const [report, setting] = await Promise.all([
         getPharmacyReportData(key, dateParams),
@@ -215,10 +236,10 @@ export default function ReportsPage() {
             <Button {...btnProps("sales-pdf")} onClick={printSalesPdf}>
               <FileDown className="h-4 w-4" />{loading === "sales-pdf" ? "กำลังสร้าง…" : "รายงานขาย (PDF จากหน้าเว็บ)"}
             </Button>
-            <Button {...btnProps("sales-excel")} onClick={() => dl("sales-excel", "/reports/sales/excel", { startDate: new Date(startDate).toISOString(), endDate: new Date(endDate + "T23:59:59").toISOString() }, "sales-report.xlsx")}>
+            <Button {...btnProps("sales-excel")} onClick={() => dl("sales-excel", "/reports/sales/excel", { startDate: toDayRange(startDate, "start"), endDate: toDayRange(endDate, "end") }, "sales-report.xlsx")}>
               <FileDown className="h-4 w-4" />{loading === "sales-excel" ? "กำลังดาวน์โหลด…" : "รายงานขาย (Excel)"}
             </Button>
-            <Button {...btnProps("sales-csv")} onClick={() => dl("sales-csv", "/reports/sales/csv", { startDate: new Date(startDate).toISOString(), endDate: new Date(endDate + "T23:59:59").toISOString() }, "sales-report.csv")}>
+            <Button {...btnProps("sales-csv")} onClick={() => dl("sales-csv", "/reports/sales/csv", { startDate: toDayRange(startDate, "start"), endDate: toDayRange(endDate, "end") }, "sales-report.csv")}>
               <FileDown className="h-4 w-4" />{loading === "sales-csv" ? "กำลังดาวน์โหลด…" : "รายงานขาย (CSV)"}
             </Button>
             <Button {...btnProps("stocks-excel")} onClick={() => dl("stocks-excel", "/reports/stocks/excel", undefined, "stocks-report.xlsx")}>
@@ -303,7 +324,7 @@ export default function ReportsPage() {
               ["khy12", "ข.ย.12 — บัญชีการขายยาตามใบสั่งของผู้ประกอบวิชาชีพฯ"],
               ["khy13", "ข.ย.13 — รายงานการขายยาตามที่เลขาธิการ อย. กำหนด"],
             ] as [string, string][]).map(([key, label]) => {
-              const dateParams = { startDate: new Date(startDate).toISOString(), endDate: new Date(endDate + "T23:59:59").toISOString() };
+              const dateParams = { startDate: toDayRange(startDate, "start"), endDate: toDayRange(endDate, "end") };
               return (
                 <div key={key} className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{label}</p>
@@ -337,3 +358,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+export default withRouteAccess(ReportsPage, { roles: ["ADMIN", "SUPER"] });

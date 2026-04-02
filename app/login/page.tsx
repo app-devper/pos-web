@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { authLogin, authGetSystem, getMyInfo } from "@/lib/um-api";
-import { setToken, setPosHost, setCurrentUser } from "@/lib/auth";
+import { clearSession, setToken, setPosHost, setCurrentUser } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,6 +29,7 @@ export default function LoginPage() {
       toast.success("เข้าสู่ระบบสำเร็จ");
       router.push("/");
     } catch (err: unknown) {
+      clearSession();
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ?? "เข้าสู่ระบบไม่สำเร็จ";

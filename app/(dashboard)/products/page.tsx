@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,13 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Search, Plus, ArrowUpDown, X, Package, RefreshCw, ChevronLeft, Upload, Download, Barcode, Tag, Sticker, FileSpreadsheet, ArrowRightLeft } from "lucide-react";
-import { createProduct, updateProduct, deleteProduct, listCategories, createProductUnit, createProductPrice, importProductsCsv, downloadReport, downloadBarcodePdf } from "@/lib/pos-api";
+import { createProduct, updateProduct, listCategories, createProductUnit, createProductPrice, downloadReport, downloadBarcodePdf } from "@/lib/pos-api";
 import { useProductCache } from "@/components/ProductCacheContext";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { CsvImportDialog } from "./_components/CsvImportDialog";
 import ProductDetailPanel from "./_components/ProductDetailPanel";
 import { ProductDetailProvider } from "./_components/ProductDetailContext";
-import { useConfirm } from "@/components/ConfirmDialog";
 import { printPriceListReport, printPriceTagsReport } from "@/lib/report-print";
 import type { ProductDetail, CreateProductRequest, Category } from "@/types/pos";
 import { Combobox } from "@/components/ui/combobox";
@@ -56,7 +54,6 @@ interface UnitForm { unit: string; price: number; costPrice: number; barcode: st
 const EMPTY_UNIT: UnitForm = { unit: "", price: 0, costPrice: 0, barcode: "", sku: "", volume: 0, volumeUnit: "" };
 
 export default function ProductsPage() {
-  const router = useRouter();
   const { products: items, loading, refresh } = useProductCache();
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
@@ -72,7 +69,6 @@ export default function ProductsPage() {
   const [saving, setSaving] = useState(false);
 
   const [csvOpen, setCsvOpen] = useState(false);
-  const confirm = useConfirm();
 
   useEffect(() => {
     listCategories()
@@ -89,7 +85,7 @@ export default function ProductsPage() {
       if (fresh) setSelected(fresh);
       else setSelected(null);
     }
-  }, [items]);
+  }, [items, selected]);
 
   function selectProduct(p: ProductDetail) {
     setSelected(p);
@@ -147,16 +143,6 @@ export default function ProductsPage() {
     finally { setSaving(false); }
   }
 
-  async function handleDelete(id: string) {
-    if (!(await confirm({ description: "ลบสินค้านี้?", destructive: true }))) return;
-    try {
-      await deleteProduct(id);
-      toast.success("ลบสินค้าแล้ว");
-      if (selected?.id === id) setSelected(null);
-      await refresh();
-    } catch { toast.error("ลบไม่สำเร็จ"); }
-  }
-
   const filtered = items
     .filter((p) =>
       !search ||
@@ -185,7 +171,7 @@ export default function ProductsPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
             {search && (
-              <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setSearch("")}>
+              <button type="button" aria-label="ล้างคำค้นหา" className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setSearch("")}>
                 <X className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
             )}
@@ -462,10 +448,10 @@ export default function ProductsPage() {
               <div>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">รายงาน</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => { router.push("/reports"); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                  <Link href="/reports" className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-indigo-500/10 text-indigo-600"><ArrowRightLeft className="h-4 w-4" /></div>
                     <div className="min-w-0"><p className="text-sm font-medium">สินค้าเข้า-ออก</p><p className="text-xs text-muted-foreground truncate">รายงานความเคลื่อนไหว</p></div>
-                  </button>
+                  </Link>
                   <button onClick={() => { downloadReport("/reports/stocks/excel", {}, "stock-report").catch(() => toast.error("ดาวน์โหลดไม่สำเร็จ")); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-teal-500/10 text-teal-600"><FileSpreadsheet className="h-4 w-4" /></div>
                     <div className="min-w-0"><p className="text-sm font-medium">รายงานสต็อก</p><p className="text-xs text-muted-foreground truncate">สรุปยอดคงเหลือ Excel</p></div>
@@ -475,7 +461,7 @@ export default function ProductsPage() {
             </div>
           </div>
         ) : (
-          <ProductDetailProvider key={detailKey} product={selected} onProductReload={refresh}>
+          <ProductDetailProvider key={detailKey} product={selected}>
             <ProductDetailPanel onEdit={() => openEdit(selected)} onBack={() => setSelected(null)} />
           </ProductDetailProvider>
         )}

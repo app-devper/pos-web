@@ -50,12 +50,16 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
   const [activeTab, setActiveTab] = useState<ProductDetailTab>("info");
 
   useEffect(() => {
-    try {
-      const savedTab = sessionStorage.getItem(PRODUCT_DETAIL_TAB_KEY);
-      if (savedTab === "info" || savedTab === "units" || savedTab === "prices" || savedTab === "stocks" || savedTab === "history") {
-        setActiveTab(savedTab);
-      }
-    } catch {}
+    const timeoutId = window.setTimeout(() => {
+      try {
+        const savedTab = sessionStorage.getItem(PRODUCT_DETAIL_TAB_KEY);
+        if (savedTab === "info" || savedTab === "units" || savedTab === "prices" || savedTab === "stocks" || savedTab === "history") {
+          setActiveTab(savedTab);
+        }
+      } catch {}
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   function handleTabChange(value: string) {

@@ -74,26 +74,29 @@ export const CartPanel = memo(function CartPanel({
         {multiCartEnabled ? (
           <div className="flex items-center gap-0 overflow-x-auto px-1 pt-1">
             {tabs.map((t, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveTab(i)}
-                className={`relative px-3 py-2 text-xs font-medium rounded-t-md transition-colors whitespace-nowrap ${activeTab === i ? "bg-background border border-b-0 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
-              >
-                {t.cart.length > 0 ? `#${i + 1} (${t.cart.length})` : `#${i + 1}`}
+              <div key={i} className="relative flex items-center">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(i)}
+                  className={`px-3 py-2 text-xs font-medium rounded-t-md transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${tabs.length > 1 ? "pr-7" : ""} ${activeTab === i ? "bg-background border border-b-0 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
+                  aria-pressed={activeTab === i}
+                >
+                  {t.cart.length > 0 ? `#${i + 1} (${t.cart.length})` : `#${i + 1}`}
+                </button>
                 {tabs.length > 1 && (
                   <button
                     type="button"
                     aria-label={`ลบตะกร้า #${i + 1}`}
-                    className="ml-1.5 text-muted-foreground hover:text-destructive"
-                    onClick={(e) => { e.stopPropagation(); removeTab(i); }}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => removeTab(i)}
                   >
                     ×
                   </button>
                 )}
-              </button>
+              </div>
             ))}
             {tabs.length < MAX_TABS && (
-              <button onClick={addTab} className="px-2 py-2 text-xs text-muted-foreground hover:text-primary" title="เพิ่มตะกร้า" aria-label="เพิ่มตะกร้า">
+              <button type="button" onClick={addTab} className="px-2 py-2 text-xs text-muted-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title="เพิ่มตะกร้า" aria-label="เพิ่มตะกร้า">
                 <Plus className="h-3.5 w-3.5" />
               </button>
             )}
@@ -122,32 +125,39 @@ export const CartPanel = memo(function CartPanel({
             </thead>
             <tbody>
               {cart.map((item) => (
-                <tr key={item.productId} className="border-b last:border-0 cursor-pointer hover:bg-accent/50" onClick={() => setDetailItem(item)}>
+                <tr key={item.productId} className="border-b last:border-0 hover:bg-accent/50">
                   <td className="px-3 py-2.5 align-top">
-                    <div className="flex items-start gap-1.5">
-                      <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                    <button
+                      type="button"
+                      onClick={() => setDetailItem(item)}
+                      className="flex w-full items-start gap-1.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                      aria-label={`ดูรายละเอียด ${item.name}`}
+                    >
+                      <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                       <div>
                         <p className="font-medium leading-tight line-clamp-2 text-xs">{item.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{item.unit || "ชิ้น"}</p>
                       </div>
-                    </div>
+                    </button>
                   </td>
                   <td className="px-1 py-2.5 align-middle">
                     <div className="flex items-center justify-center gap-1.5">
                       <button
+                        type="button"
                         aria-label="ลดจำนวน"
-                        onClick={(e) => { e.stopPropagation(); updateQty(item.productId, -1); }}
-                        className="h-6 w-6 rounded-full bg-destructive/15 text-destructive flex items-center justify-center hover:bg-destructive/25 transition-colors"
+                        onClick={() => updateQty(item.productId, -1)}
+                        className="h-6 w-6 rounded-full bg-destructive/15 text-destructive flex items-center justify-center hover:bg-destructive/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <Minus className="h-3 w-3" />
+                        <Minus className="h-3 w-3" aria-hidden="true" />
                       </button>
                       <span className="text-sm font-medium w-5 text-center">{item.quantity}x</span>
                       <button
+                        type="button"
                         aria-label="เพิ่มจำนวน"
-                        onClick={(e) => { e.stopPropagation(); updateQty(item.productId, 1); }}
-                        className="h-6 w-6 rounded-full bg-primary/15 text-primary flex items-center justify-center hover:bg-primary/25 transition-colors"
+                        onClick={() => updateQty(item.productId, 1)}
+                        className="h-6 w-6 rounded-full bg-primary/15 text-primary flex items-center justify-center hover:bg-primary/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-3 w-3" aria-hidden="true" />
                       </button>
                     </div>
                   </td>
@@ -165,6 +175,7 @@ export const CartPanel = memo(function CartPanel({
       <div className="shrink-0 border-t">
         <div className="flex items-center gap-2 px-3 py-2">
           <button
+            type="button"
             className="flex-1 flex items-center gap-3 px-1 py-1 hover:bg-accent rounded-md transition-colors text-left"
             onClick={() => setCustomerPickerOpen(true)}
           >
@@ -189,6 +200,7 @@ export const CartPanel = memo(function CartPanel({
           <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
             {customerCode ? (
               <button
+                type="button"
                 aria-label="ล้างลูกค้า"
                 className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={() => { setCustomerCode(""); setCustomerName(""); }}
@@ -204,6 +216,7 @@ export const CartPanel = memo(function CartPanel({
         <div className="shrink-0 border-t">
           <div className="flex items-center gap-2 px-3 py-2">
             <button
+              type="button"
               className="flex-1 flex items-center gap-3 px-1 py-1 hover:bg-accent rounded-md transition-colors text-left"
               onClick={() => setPatientPickerOpen(true)}
             >
@@ -219,7 +232,7 @@ export const CartPanel = memo(function CartPanel({
             </button>
             <div className="h-8 w-8 flex items-center justify-center shrink-0">
               {linkedPatient ? (
-                <button aria-label="ล้างผู้ป่วย" className="p-1 text-muted-foreground hover:text-foreground" onClick={() => setLinkedPatient(null)}>
+                <button type="button" aria-label="ล้างผู้ป่วย" className="p-1 text-muted-foreground hover:text-foreground" onClick={() => setLinkedPatient(null)}>
                   <X className="h-3.5 w-3.5" />
                 </button>
               ) : null}
@@ -235,6 +248,7 @@ export const CartPanel = memo(function CartPanel({
         </div>
         <div className="flex items-center justify-between px-4 py-2.5 border-b">
           <button
+            type="button"
             className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
             onClick={openPromo}
           >
@@ -245,7 +259,7 @@ export const CartPanel = memo(function CartPanel({
           {promoDiscount > 0 ? (
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-medium text-destructive">-฿{fmt(promoDiscount)}</span>
-              <button aria-label="ลบโปรโมชัน" className="text-muted-foreground hover:text-foreground" onClick={clearPromo}>
+              <button type="button" aria-label="ลบโปรโมชัน" className="text-muted-foreground hover:text-foreground" onClick={clearPromo}>
                 <X className="h-3 w-3" />
               </button>
             </div>
@@ -255,6 +269,7 @@ export const CartPanel = memo(function CartPanel({
         </div>
         <div className="flex items-center justify-between px-4 py-2.5 border-b">
           <button
+            type="button"
             className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
             onClick={() => setDiscountOpen(true)}
           >
@@ -264,7 +279,7 @@ export const CartPanel = memo(function CartPanel({
           {discount > 0 ? (
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-medium text-destructive">-฿{fmt(discount)}</span>
-              <button aria-label="ล้างส่วนลด" className="text-muted-foreground hover:text-foreground" onClick={() => setDiscount(0)}>
+              <button type="button" aria-label="ล้างส่วนลด" className="text-muted-foreground hover:text-foreground" onClick={() => setDiscount(0)}>
                 <X className="h-3 w-3" />
               </button>
             </div>

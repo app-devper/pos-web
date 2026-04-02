@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { listPromotions, createPromotion, updatePromotion, deletePromotion } from "@/lib/pos-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
 import type { Promotion, PromotionRequest } from "@/types/pos";
 import { useConfirm } from "@/components/ConfirmDialog";
 
@@ -22,12 +23,12 @@ function toDateInput(d?: string) {
 
 function toISODate(d: string) {
   if (!d) return undefined;
-  return new Date(d + "T00:00:00").toISOString();
+  return `${d}T00:00:00.000`;
 }
 
 const EMPTY: PromotionRequest = { code: "", name: "", description: "", type: "PERCENTAGE", value: 0, minPurchase: 0, maxDiscount: 0, startDate: "", endDate: "", status: "ACTIVE" };
 
-export default function PromotionsPage() {
+function PromotionsPage() {
   const [items, setItems] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -166,3 +167,4 @@ export default function PromotionsPage() {
   );
 }
 
+export default withRouteAccess(PromotionsPage, { roles: ["ADMIN", "SUPER"] });

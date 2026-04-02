@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,34 @@ import {
   listReceives, getReceive, createReceive, updateReceive, deleteReceive,
   listSuppliers, listProducts, importReceiveToStock, createSupplier,
 } from "@/lib/pos-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
 import type { Receive, Supplier, ProductDetail, CreateReceiveItemData } from "@/types/pos";
 import { useConfirm } from "@/components/ConfirmDialog";
 
 const fmt = (n: number) => new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2 }).format(n ?? 0);
+
+function formatLocalDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toDateInput(value?: string) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return formatLocalDateInput(date);
+}
+
+function toDayRange(date: string, boundary: "start" | "end") {
+  return `${date}T${boundary === "start" ? "00:00:00.000" : "23:59:59.999"}`;
+}
+
+function toDateTimeValue(date: string) {
+  return `${date}T00:00:00.000`;
+}
 
 function generateLotNumber(): string {
   const now = new Date();
@@ -54,14 +78,18 @@ const EMPTY_STOCK_ITEM: StockItemForm = {
 
 const EMPTY_SUPPLIER_FORM = { name: "", phone: "", email: "", address: "", taxId: "" };
 
-export default function ReceivesPage() {
+function ReceivesPage() {
   // ─── List state ──────────────────────────────────────────
   const [items, setItems] = useState<Receive[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<ProductDetail[]>([]);
   const [loading, setLoading] = useState(false);
-  const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().split("T")[0]; });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return formatLocalDateInput(d);
+  });
+  const [endDate, setEndDate] = useState(() => formatLocalDateInput(new Date()));
 
   // ─── Create / Edit GR dialog ─────────────────────────────
   const [grOpen, setGrOpen] = useState(false);
@@ -81,6 +109,7 @@ export default function ReceivesPage() {
   const [detail, setDetail] = useState<Receive | null>(null);
   const [importing, setImporting] = useState(false);
   const confirm = useConfirm();
+  const dateRangeRef = useRef({ startDate, endDate });
 
   // ─── Supplier map ────────────────────────────────────────
   const supplierMap = useMemo(() => {
@@ -108,13 +137,18 @@ export default function ReceivesPage() {
   }, [products, grProductSearch]);
 
   // ─── Load data ───────────────────────────────────────────
-  const load = () => {
+  useEffect(() => {
+    dateRangeRef.current = { startDate, endDate };
+  }, [endDate, startDate]);
+
+  const load = useCallback(() => {
+    const { startDate: currentStartDate, endDate: currentEndDate } = dateRangeRef.current;
     setLoading(true);
-    listReceives(new Date(startDate).toISOString(), new Date(endDate + "T23:59:59").toISOString())
+    listReceives(toDayRange(currentStartDate, "start"), toDayRange(currentEndDate, "end"))
       .then((d) => setItems(Array.isArray(d) ? d : []))
       .catch(() => toast.error("โหลดข้อมูลไม่สำเร็จ"))
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   const loadSuppliers = () => {
     listSuppliers().then((d) => setSuppliers(Array.isArray(d) ? d : [])).catch(() => {});
@@ -124,7 +158,7 @@ export default function ReceivesPage() {
     load();
     loadSuppliers();
     listProducts().then((d) => setProducts(Array.isArray(d) ? d : [])).catch(() => {});
-  }, []);
+  }, [load]);
 
   // ─── Create / Edit GR ───────────────────────────────────
   function openCreateGr() {
@@ -159,7 +193,7 @@ export default function ReceivesPage() {
         costPrice: it.costPrice,
         price: prod?.price ?? 0,
         lotNumber: it.lotNumber ?? "",
-        expireDate: it.expireDate ? new Date(it.expireDate).toISOString().split("T")[0] : "",
+        expireDate: toDateInput(it.expireDate),
       };
     });
     setGrItems(existingItems);
@@ -223,7 +257,7 @@ export default function ReceivesPage() {
           costPrice: it.costPrice,
           quantity: it.quantity,
           lotNumber: it.lotNumber,
-          expireDate: new Date(it.expireDate).toISOString(),
+          expireDate: toDateTimeValue(it.expireDate),
         }));
         const updated = await updateReceive(grEditing.id, {
           supplierId: grSupplierId,
@@ -241,7 +275,7 @@ export default function ReceivesPage() {
           costPrice: it.costPrice,
           quantity: it.quantity,
           lotNumber: it.lotNumber,
-          expireDate: new Date(it.expireDate).toISOString(),
+          expireDate: toDateTimeValue(it.expireDate),
         }));
         const created = await createReceive({ supplierId: grSupplierId, reference: grReference, items: receiveItems });
         toast.success(`สร้างใบรับสินค้าแล้ว (${grItems.length} รายการ)`);
@@ -657,3 +691,5 @@ export default function ReceivesPage() {
     </div>
   );
 }
+
+export default withRouteAccess(ReceivesPage, { roles: ["ADMIN", "SUPER"] });

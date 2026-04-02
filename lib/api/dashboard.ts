@@ -5,6 +5,11 @@ import type {
   AllergyCheckRequest, AllergyCheckResult, CustomerHistoryRequest
 } from "@/types/pos";
 
+export interface AppliedPromotionResult {
+  discount?: number;
+  name?: string;
+}
+
 // Dashboard
 export const getDashboardSummary = (startDate: string, endDate: string): Promise<DashboardSummary> =>
   posApi.get("/dashboard/summary", { params: { startDate, endDate } });
@@ -35,7 +40,7 @@ export const getPromotion = (id: string): Promise<Promotion> => posApi.get(`/pro
 export const createPromotion = (data: PromotionRequest): Promise<unknown> => posApi.post("/promotions", data);
 export const updatePromotion = (id: string, data: PromotionRequest): Promise<unknown> => posApi.put(`/promotions/${id}`, data);
 export const deletePromotion = (id: string): Promise<unknown> => posApi.delete(`/promotions/${id}`);
-export const applyPromotion = (data: ApplyPromotionRequest): Promise<unknown> => posApi.post("/promotions/apply", data);
+export const applyPromotion = (data: ApplyPromotionRequest): Promise<AppliedPromotionResult> => posApi.post("/promotions/apply", data);
 
 // Patients
 export const listPatients = (): Promise<Patient[]> => posApi.get("/patients");
@@ -49,4 +54,4 @@ export const checkAllergies = (patientId: string, data: AllergyCheckRequest): Pr
 
 // Customer History
 export const createCustomerHistory = (data: CustomerHistoryRequest): Promise<unknown> => posApi.post("/customer-histories", data);
-export const getCustomerHistory = (customerCode: string): Promise<any> => posApi.get(`/customer-histories/${customerCode}`);
+export const getCustomerHistory = (customerCode: string): Promise<unknown> => posApi.get(`/customer-histories/${customerCode}`);

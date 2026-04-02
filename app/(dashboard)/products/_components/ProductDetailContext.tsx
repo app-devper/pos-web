@@ -62,11 +62,10 @@ export function useProductDetail() {
 
 interface ProviderProps {
   product: ProductDetail;
-  onProductReload: () => void;
   children: React.ReactNode;
 }
 
-export function ProductDetailProvider({ product, onProductReload, children }: ProviderProps) {
+export function ProductDetailProvider({ product, children }: ProviderProps) {
   const [units, setUnits] = useState<ProductUnit[]>([]);
   const [stocks, setStocks] = useState<ProductStock[]>([]);
   const [prices, setPrices] = useState<ProductPrice[]>([]);
@@ -106,7 +105,13 @@ export function ProductDetailProvider({ product, onProductReload, children }: Pr
       .finally(() => setLoading(false));
   }, [product.id]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      reload();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [reload]);
 
   const confirm = useConfirm();
 

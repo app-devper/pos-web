@@ -23,9 +23,10 @@ export const authLogin = (data: LoginRequest): Promise<LoginResponse> =>
   umApi.post("/auth/login", data);
 
 export const authKeepAlive = (): Promise<KeepAliveResponse> =>
-  umApi.get("/auth/keep-alive").then((r: any) => {
-    setToken(r.accessToken);
-    return r;
+  umApi.get("/auth/keep-alive").then((response) => {
+    const data = response as unknown as KeepAliveResponse;
+    setToken(data.accessToken);
+    return data;
   });
 
 export const authGetSystem = (): Promise<System> =>

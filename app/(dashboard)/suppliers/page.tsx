@@ -10,16 +10,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { listSuppliers, createSupplier, updateSupplier, deleteSupplier } from "@/lib/pos-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
+import type { Supplier } from "@/types/pos";
 import { useConfirm } from "@/components/ConfirmDialog";
 
 const EMPTY = { name: "", phone: "", email: "", address: "", taxId: "" };
 
-export default function SuppliersPage() {
-  const [items, setItems] = useState<Record<string, unknown>[]>([]);
+function SuppliersPage() {
+  const [items, setItems] = useState<Supplier[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
+  const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
@@ -35,9 +37,9 @@ export default function SuppliersPage() {
   useEffect(() => { load(); }, []);
 
   function openCreate() { setEditing(null); setForm(EMPTY); setOpen(true); }
-  function openEdit(s: Record<string, unknown>) {
+  function openEdit(s: Supplier) {
     setEditing(s);
-    setForm({ name: (s.name as string) ?? "", phone: (s.phone as string) ?? "", email: (s.email as string) ?? "", address: (s.address as string) ?? "", taxId: (s.taxId as string) ?? "" });
+    setForm({ name: s.name ?? "", phone: s.phone ?? "", email: s.email ?? "", address: s.address ?? "", taxId: s.taxId ?? "" });
     setOpen(true);
   }
 
@@ -86,14 +88,14 @@ export default function SuppliersPage() {
               <TableBody>
                 {filtered.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">ไม่พบข้อมูล</TableCell></TableRow>}
                 {filtered.map((s) => (
-                  <TableRow key={s.id as string}>
-                    <TableCell className="font-medium">{s.name as string}</TableCell>
-                    <TableCell>{(s.phone as string) ?? "-"}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{(s.email as string) ?? "-"}</TableCell>
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.name}</TableCell>
+                    <TableCell>{s.phone ?? "-"}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{s.email ?? "-"}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(s.id as string)}><Trash2 className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -125,3 +127,5 @@ export default function SuppliersPage() {
     </div>
   );
 }
+
+export default withRouteAccess(SuppliersPage, { roles: ["ADMIN", "SUPER"] });

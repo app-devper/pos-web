@@ -11,12 +11,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, Search, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { listPatients, createPatient, updatePatient, deletePatient, getDispensingLogsByPatient } from "@/lib/pos-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
 import type { Patient, PatientRequest } from "@/types/pos";
 import { useConfirm } from "@/components/ConfirmDialog";
 
 const EMPTY: PatientRequest = { customerCode: "", idCard: "", firstName: "", lastName: "", phone: "", email: "", address: "", gender: "", bloodType: "", weight: 0, note: "", consentGiven: false };
+type DispensingHistoryEntry = {
+  id?: string;
+  _id?: string;
+  createdDate?: string;
+  productName?: string;
+  quantity?: number;
+};
 
-export default function PatientsPage() {
+function PatientsPage() {
   const [items, setItems] = useState<Patient[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -28,8 +36,7 @@ export default function PatientsPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [page, setPage] = useState(0);
   const pageSize = 20;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [dispensingHistory, setDispensingHistory] = useState<any[]>([]);
+  const [dispensingHistory, setDispensingHistory] = useState<DispensingHistoryEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const confirm = useConfirm();
 
@@ -113,7 +120,10 @@ export default function PatientsPage() {
                         <Button size="icon" variant="ghost" aria-label="ดูรายละเอียด" onClick={() => {
                         setDetail(p); setDetailOpen(true);
                         setLoadingHistory(true); setDispensingHistory([]);
-                        getDispensingLogsByPatient(p.id).then(setDispensingHistory).catch(() => {}).finally(() => setLoadingHistory(false));
+                        getDispensingLogsByPatient(p.id)
+                          .then((history) => setDispensingHistory(Array.isArray(history) ? history as DispensingHistoryEntry[] : []))
+                          .catch(() => {})
+                          .finally(() => setLoadingHistory(false));
                       }}><Eye className="h-4 w-4" /></Button>
                         <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
                         <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(p.id)}><Trash2 className="h-4 w-4" /></Button>
@@ -193,7 +203,7 @@ export default function PatientsPage() {
                         <TableHead className="text-xs">จำนวน</TableHead>
                       </TableRow></TableHeader>
                       <TableBody>
-                        {dispensingHistory.map((d: { id?: string; _id?: string; createdDate?: string; productName?: string; quantity?: number }, i: number) => (
+                        {dispensingHistory.map((d, i: number) => (
                           <TableRow key={d.id ?? d._id ?? i}>
                             <TableCell className="text-xs">{d.createdDate ? new Date(d.createdDate).toLocaleDateString("th-TH") : "-"}</TableCell>
                             <TableCell className="text-xs">{d.productName ?? "-"}</TableCell>
@@ -253,3 +263,5 @@ export default function PatientsPage() {
     </div>
   );
 }
+
+export default withRouteAccess(PatientsPage, { feature: "patientLinking" });

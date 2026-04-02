@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2, ToggleLeft, Users, UserPlus, X } from "lucide-react";
 import { listBranches, createBranch, updateBranch, deleteBranch, updateBranchStatus, getEmployeesByBranch, createEmployee, deleteEmployee } from "@/lib/pos-api";
 import { listUsers } from "@/lib/um-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
 import type { Employee } from "@/types/pos";
 import type { User } from "@/types/um";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -30,7 +31,7 @@ interface Branch {
   status?: string;
 }
 
-export default function BranchesPage() {
+function BranchesPage() {
   const [items, setItems] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const confirm = useConfirm();
@@ -335,3 +336,5 @@ export default function BranchesPage() {
     </div>
   );
 }
+
+export default withRouteAccess(BranchesPage, { roles: ["ADMIN", "SUPER"] });

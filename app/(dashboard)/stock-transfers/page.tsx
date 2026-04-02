@@ -11,11 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Eye, CheckCircle, XCircle } from "lucide-react";
 import { listStockTransfers, createStockTransfer, getStockTransfer, approveStockTransfer, rejectStockTransfer } from "@/lib/pos-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
 import type { StockTransfer, StockTransferRequest } from "@/types/pos";
 
 const EMPTY: StockTransferRequest = { toBranchId: "", items: [{ productId: "", quantity: 1 }], note: "" };
 
-export default function StockTransfersPage() {
+function StockTransfersPage() {
   const [items, setItems] = useState<StockTransfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -134,3 +135,5 @@ export default function StockTransfersPage() {
     </div>
   );
 }
+
+export default withRouteAccess(StockTransfersPage, { roles: ["ADMIN", "SUPER"] });

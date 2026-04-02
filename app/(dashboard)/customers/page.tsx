@@ -11,12 +11,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, Search, ToggleLeft, Receipt, X } from "lucide-react";
-import { listCustomers, createCustomer, updateCustomer, deleteCustomer, updateCustomerStatus, getOrdersByCustomer } from "@/lib/pos-api";
-import type { Customer, CustomerRequest, Order } from "@/types/pos";
+import { listCustomers, createCustomer, updateCustomer, deleteCustomer, updateCustomerStatus, getOrdersByCustomer, getOrder } from "@/lib/pos-api";
+import type { Customer, CustomerRequest, Order, OrderDetail } from "@/types/pos";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { CUSTOMER_TYPE_LABEL, CUSTOMER_TYPES } from "@/app/(dashboard)/sale/_utils";
 
 const EMPTY: CustomerRequest = { name: "", customerType: "General", address: "", phone: "", email: "" };
+const PAYMENT_LABEL: Record<string, string> = { CASH: "เงินสด", CREDIT: "บัตรเครดิต", PROMPTPAY: "พร้อมเพย์", TRANSFER: "โอนเงิน" };
+
+function getPaymentSummary(order: Order | OrderDetail) {
+  const detailOrder = order as OrderDetail;
+  const payments = Array.isArray(detailOrder.payments) && detailOrder.payments.length > 0
+    ? detailOrder.payments
+    : detailOrder.payment
+      ? [detailOrder.payment]
+      : [];
+
+  if (payments.length === 0) {
+    return PAYMENT_LABEL[order.type] ?? order.type;
+  }
+
+  return payments
+    .map((payment) => `${PAYMENT_LABEL[payment.type] ?? payment.type} ฿${new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2 }).format(payment.amount ?? 0)}`)
+    .join(", ");
+}
 
 export default function CustomersPage() {
   const [items, setItems] = useState<Customer[]>([]);
@@ -27,7 +45,7 @@ export default function CustomersPage() {
   const [form, setForm] = useState<CustomerRequest>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
-  const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
+  const [historyOrders, setHistoryOrders] = useState<Array<Order | OrderDetail>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const confirm = useConfirm();
 
@@ -82,7 +100,17 @@ export default function CustomersPage() {
     setHistoryLoading(true);
     try {
       const data = await getOrdersByCustomer(c.code);
-      setHistoryOrders(Array.isArray(data) ? data : []);
+      const orders = Array.isArray(data) ? data : [];
+      const detailedOrders = await Promise.all(
+        orders.map(async (order) => {
+          try {
+            return await getOrder(order.id);
+          } catch {
+            return order;
+          }
+        })
+      );
+      setHistoryOrders(detailedOrders);
     } catch {
       toast.error("โหลดประวัติการซื้อไม่สำเร็จ");
     } finally {
@@ -222,22 +250,24 @@ export default function CustomersPage() {
             ) : (
               <div className="h-full max-h-[calc(100vh-14rem)] overflow-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/30">
-                      <TableHead>เลขที่</TableHead>
-                      <TableHead>วันที่</TableHead>
-                      <TableHead>สถานะ</TableHead>
-                      <TableHead className="text-right">ยอดรวม</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {historyOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.code || order.id.slice(-8)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtDateTime(order.createdDate)}</TableCell>
-                        <TableCell>
-                          <Badge variant={order.status === "VOIDED" || order.status === "CANCELLED" ? "destructive" : "default"}>
-                            {order.status}
+                    <TableHeader>
+                      <TableRow className="bg-muted/30">
+                        <TableHead>เลขที่</TableHead>
+                        <TableHead>วันที่</TableHead>
+                        <TableHead>ชำระเงิน</TableHead>
+                        <TableHead>สถานะ</TableHead>
+                        <TableHead className="text-right">ยอดรวม</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {historyOrders.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell className="font-medium">{order.code || order.id.slice(-8)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtDateTime(order.createdDate)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{getPaymentSummary(order)}</TableCell>
+                          <TableCell>
+                            <Badge variant={order.status === "VOIDED" || order.status === "CANCELLED" ? "destructive" : "default"}>
+                              {order.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-medium tabular-nums">฿{fmt.format(order.total ?? 0)}</TableCell>

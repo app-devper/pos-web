@@ -1,17 +1,16 @@
 "use client";
 
-import { memo, useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Search, Plus, Minus, ShoppingCart, UserSearch, X, RefreshCw, ChevronRight, Info, Heart, Tag } from "lucide-react";
+import { Search, ShoppingCart, RefreshCw } from "lucide-react";
 import { listCategories, createOrder, checkDrugInteractions, printPrescriptionLabel } from "@/lib/pos-api";
 import { useProductCache } from "@/components/ProductCacheContext";
 import { useSettings } from "@/components/SettingsContext";
-import type { Category, Order, Customer, Patient, ProductDetail } from "@/types/pos";
+import type { Category, Order, OrderPayment, Customer, Patient, ProductDetail } from "@/types/pos";
 
 import { CustomerPickerDialog } from "./_components/CustomerPickerDialog";
 import { CartItemDialog } from "./_components/CartItemDialog";
@@ -88,6 +87,17 @@ export default function SalePage() {
   const [discountOpen, setDiscountOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
+  const [lastOrderPayments, setLastOrderPayments] = useState<OrderPayment[]>([]);
+  const [lastOrderChange, setLastOrderChange] = useState(0);
+
+  const handleSuccessOpenChange = useCallback((open: boolean) => {
+    setSuccessOpen(open);
+    if (!open) {
+      setLastOrder(null);
+      setLastOrderPayments([]);
+      setLastOrderChange(0);
+    }
+  }, []);
 
   // Drug interaction alert
   const [drugAlerts, setDrugAlerts] = useState<{ productAName: string; productBName: string; interaction: string }[]>([]);
@@ -218,6 +228,8 @@ export default function SalePage() {
       };
       const order = await createOrder(orderPayload as Parameters<typeof createOrder>[0]);
       setLastOrder(order);
+      setLastOrderPayments(orderPayload.payments);
+      setLastOrderChange(Math.max(0, paymentsTotal - total));
       setPayOpen(false);
       setSuccessOpen(true);
       clearCart();
@@ -432,8 +444,10 @@ export default function SalePage() {
       {/* ─── Success Dialog ─── */}
       <SuccessDialog
         open={successOpen}
-        onOpenChange={setSuccessOpen}
+        onOpenChange={handleSuccessOpenChange}
         order={lastOrder}
+        payments={lastOrderPayments}
+        change={lastOrderChange}
         prescriptionLabelEnabled={isFeatureEnabled("prescriptionLabel")}
         onPrintLabel={(orderId, size) => {
           printPrescriptionLabel(orderId, size).catch(() => toast.error("พิมพ์ฉลากยาไม่สำเร็จ"));

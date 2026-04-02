@@ -1,9 +1,8 @@
 import { posApi } from "./client";
-import { downloadBlob } from "../utils";
 import type { Order, OrderDetail, CreateOrderRequest } from "@/types/pos";
 
 export const createOrder = (data: CreateOrderRequest): Promise<Order> =>
-  posApi.post("/orders", data).then((r: any) => r?.data ?? r);
+  posApi.post("/orders", data);
 
 export const listOrders = (startDate: string, endDate: string): Promise<Order[]> =>
   posApi.get("/orders", { params: { startDate, endDate } });
@@ -20,10 +19,10 @@ export const updateOrderCustomerCode = (orderId: string, data: unknown): Promise
 export const getOrdersByCustomer = (customerCode: string): Promise<Order[]> =>
   posApi.get(`/orders/customers/${customerCode}`);
 
-export const listOrderItems = (startDate: string, endDate: string): Promise<any> =>
+export const listOrderItems = (startDate: string, endDate: string): Promise<unknown> =>
   posApi.get("/orders/items", { params: { startDate, endDate } });
 
-export const getOrderItem = (itemId: string): Promise<any> =>
+export const getOrderItem = (itemId: string): Promise<unknown> =>
   posApi.get(`/orders/items/${itemId}`);
 
 export const printPrescriptionLabel = async (orderId: string, size: "8x5" | "5x3" = "8x5"): Promise<void> => {
@@ -31,7 +30,7 @@ export const printPrescriptionLabel = async (orderId: string, size: "8x5" | "5x3
     params: { size }, 
     responseType: "blob" 
   });
-  const url = window.URL.createObjectURL(response as unknown as Blob);
+  const url = window.URL.createObjectURL(response.data as Blob);
   const w = window.open(url);
   if (w) w.print();
 };

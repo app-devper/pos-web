@@ -230,7 +230,8 @@ export interface OrderDetailPayment {
 
 export interface OrderDetail extends Order {
   items: OrderDetailItem[];
-  payment: OrderDetailPayment;
+  payments?: OrderDetailPayment[];
+  payment?: OrderDetailPayment;
 }
 
 export interface CreateOrderRequest {

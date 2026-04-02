@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, Search, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { listLots, createLot, updateLot, deleteLot } from "@/lib/pos-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
 import { useProductCache } from "@/components/ProductCacheContext";
 import type { ProductLot } from "@/types/pos";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -31,7 +32,7 @@ function generateLotNumber() {
   return `LOT-${datePart}-${timePart}`;
 }
 
-export default function BatchesPage() {
+function BatchesPage() {
   const { products } = useProductCache();
   const [items, setItems] = useState<ProductLot[]>([]);
   const [search, setSearch] = useState("");
@@ -238,3 +239,5 @@ export default function BatchesPage() {
     </div>
   );
 }
+
+export default withRouteAccess(BatchesPage, { feature: "batchTracking" });

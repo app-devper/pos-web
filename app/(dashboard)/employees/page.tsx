@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { listEmployees, createEmployee, updateEmployee, deleteEmployee } from "@/lib/pos-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
 import { useConfirm } from "@/components/ConfirmDialog";
 
 const EMPTY = { name: "", position: "", phone: "", email: "", branchId: "" };
 
-export default function EmployeesPage() {
+function EmployeesPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,3 +117,5 @@ export default function EmployeesPage() {
     </div>
   );
 }
+
+export default withRouteAccess(EmployeesPage, { roles: ["ADMIN", "SUPER"] });

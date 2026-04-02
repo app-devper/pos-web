@@ -3,19 +3,28 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tag } from "lucide-react";
-import type { Order } from "@/types/pos";
+import type { Order, OrderPayment } from "@/types/pos";
 import { fmt } from "../_utils";
+
+const PAYMENT_LABEL: Record<OrderPayment["type"], string> = {
+    CASH: "เงินสด",
+    PROMPTPAY: "พร้อมเพย์",
+};
 
 export function SuccessDialog({
     open,
     onOpenChange,
     order,
+    payments,
+    change,
     prescriptionLabelEnabled,
     onPrintLabel,
 }: {
     open: boolean;
     onOpenChange: (v: boolean) => void;
     order: Order | null;
+    payments: OrderPayment[];
+    change: number;
     prescriptionLabelEnabled: boolean;
     onPrintLabel: (orderId: string, size: "8x5" | "5x3") => void;
 }) {
@@ -28,6 +37,25 @@ export function SuccessDialog({
                     <p className="font-mono font-semibold">{order?.code ?? "-"}</p>
                     <p className="text-muted-foreground">ยอดรวม</p>
                     <p className="font-semibold text-primary text-lg">฿{fmt(order?.total ?? 0)}</p>
+                    {payments.length > 0 && (
+                        <>
+                            <p className="text-muted-foreground pt-1">การชำระเงิน</p>
+                            <div className="space-y-1">
+                                {payments.map((payment, index) => (
+                                    <div key={`${payment.type}-${index}`} className="flex items-center justify-between rounded-md border px-2.5 py-2">
+                                        <span>{PAYMENT_LABEL[payment.type] ?? payment.type}{payments.length > 1 ? ` ${index + 1}` : ""}</span>
+                                        <span className="font-medium tabular-nums">฿{fmt(payment.amount)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            {change > 0 && (
+                                <>
+                                    <p className="text-muted-foreground">เงินทอน</p>
+                                    <p className="font-medium tabular-nums text-emerald-600">฿{fmt(change)}</p>
+                                </>
+                            )}
+                        </>
+                    )}
                 </div>
                 <DialogFooter className="flex-col gap-2 sm:flex-col">
                     {prescriptionLabelEnabled && order?.id && (

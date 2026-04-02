@@ -42,13 +42,21 @@ function formatPlaceholderAmount(value?: number): string {
 
 function toDateInput(d: string | Date | undefined): string {
   if (!d) return "";
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
   const date = typeof d === "string" ? new Date(d) : d;
   if (isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toDateInput(new Date());
+}
+
+function toDateTimeValue(date: string): string {
+  return `${date}T00:00:00.000`;
 }
 
 function generateLotNumber(): string {
@@ -80,9 +88,6 @@ export default function StockDialog({ open, onOpenChange, productId, editing, un
   const quantityPlaceholder = `ระบุจำนวน ${selectedUnitName}`;
   const costPlaceholder = `${formatPlaceholderAmount(selectedUnit?.costPrice)} จากหน่วยนับ`;
   const pricePlaceholder = `${formatPlaceholderAmount(selectedRetailPrice?.price)} จากหน่วยนับ`;
-  const selectedDefaults = getUnitDefaults(form.unitId, units, prices);
-  const isUsingUnitCostPrice = form.costPrice === selectedDefaults.costPrice;
-  const isUsingUnitSalePrice = form.price === selectedDefaults.price;
   const numberInputClass = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
   useEffect(() => {
@@ -138,8 +143,8 @@ export default function StockDialog({ open, onOpenChange, productId, editing, un
           costPrice: form.costPrice || undefined,
           price: form.price || undefined,
           lotNumber: form.lotNumber || undefined,
-          expireDate: new Date(form.expireDate).toISOString(),
-          importDate: new Date(form.importDate).toISOString(),
+          expireDate: toDateTimeValue(form.expireDate),
+          importDate: toDateTimeValue(form.importDate),
         });
       } else {
         await createProductStock({
@@ -151,8 +156,8 @@ export default function StockDialog({ open, onOpenChange, productId, editing, un
           price: form.price || undefined,
           lotNumber: form.lotNumber || undefined,
           receiveCode: form.receiveCode || undefined,
-          expireDate: new Date(form.expireDate).toISOString(),
-          importDate: new Date(form.importDate).toISOString(),
+          expireDate: toDateTimeValue(form.expireDate),
+          importDate: toDateTimeValue(form.importDate),
         });
       }
       toast.success(editing ? "อัปเดต stock แล้ว" : "เพิ่ม stock แล้ว");

@@ -22,11 +22,33 @@ export function CustomerPickerDialog({
 
     useEffect(() => {
         if (!open) return;
-        setLoading(true);
-        listCustomers()
-            .then((data) => setCustomers(Array.isArray(data) ? data : []))
-            .catch(() => { })
-            .finally(() => setLoading(false));
+
+        let cancelled = false;
+
+        const loadCustomers = async () => {
+            await Promise.resolve();
+            if (cancelled) return;
+
+            setLoading(true);
+            try {
+                const data = await listCustomers();
+                if (!cancelled) {
+                    setCustomers(Array.isArray(data) ? data : []);
+                }
+            } catch {
+                // ignore
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        void loadCustomers();
+
+        return () => {
+            cancelled = true;
+        };
     }, [open]);
 
     const filtered = customers.filter((c) => {

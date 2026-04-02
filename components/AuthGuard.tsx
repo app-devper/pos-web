@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getToken, setToken, getPosHost, getCurrentUser, setCurrentUser } from "@/lib/auth";
+import { getToken, setToken, getPosHost, setCurrentUser } from "@/lib/auth";
 import { authKeepAlive, getMyInfo } from "@/lib/um-api";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -22,10 +22,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     authKeepAlive()
       .then(async (res) => {
         setToken(res.accessToken);
-        if (!getCurrentUser()) {
-          const user = await getMyInfo();
-          setCurrentUser(user);
-        }
+        const user = await getMyInfo();
+        setCurrentUser(user);
         setReady(true);
       })
       .catch(() => {

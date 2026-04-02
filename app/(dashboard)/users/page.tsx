@@ -17,12 +17,13 @@ import {
   listUsers, createUser, updateUser, deleteUser,
   updateUserStatus, updateUserRole, setUserPassword, authGetSystem,
 } from "@/lib/um-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
 import type { User, CreateUserRequest, UpdateUserRequest, Role, UserStatus } from "@/types/um";
 
 const EMPTY_CREATE: CreateUserRequest = { firstName: "", lastName: "", username: "", password: "", clientId: "", phone: "", email: "" };
 const EMPTY_EDIT: UpdateUserRequest = { firstName: "", lastName: "", phone: "", email: "" };
 
-export default function UsersPage() {
+function UsersPage() {
   const [items, setItems] = useState<User[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -230,3 +231,5 @@ export default function UsersPage() {
     </div>
   );
 }
+
+export default withRouteAccess(UsersPage, { roles: ["ADMIN", "SUPER"] });

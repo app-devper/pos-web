@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Banknote, QrCode, ChevronLeft, Delete } from "lucide-react";
+import { Banknote, QrCode, ChevronLeft, Delete, Plus, X } from "lucide-react";
 import type { OrderPayment } from "@/types/pos";
 import { fmt } from "../_utils";
 
@@ -42,13 +42,22 @@ export function PaymentDialog({
     const change = Math.max(0, paymentsTotal - total);
 
     const [inputBuf, setInputBuf] = useState("");
+    const paymentsRef = useRef(payments);
 
     useEffect(() => {
-        if (open) {
+        paymentsRef.current = payments;
+    }, [payments]);
+
+    useEffect(() => {
+        if (!open) return;
+
+        const timeoutId = window.setTimeout(() => {
             setActiveIdx(0);
-            const amt = payments[0]?.amount ?? 0;
+            const amt = paymentsRef.current[0]?.amount ?? 0;
             setInputBuf(amt > 0 ? amt.toString() : "");
-        }
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
     }, [open]);
 
     const flushBuf = useCallback((buf: string, idx: number, updater: typeof onUpdateRow) => {
@@ -71,12 +80,6 @@ export function PaymentDialog({
         flushBuf(next, activeIdx, onUpdateRow);
     }
 
-    function handleExactPay() {
-        const remaining = Math.max(0, total - (paymentsTotal - (activeRow?.amount ?? 0)));
-        onUpdateRow(activeIdx, "amount", remaining);
-        setInputBuf(remaining.toString());
-    }
-
     function selectPaymentType(type: OrderPayment["type"]) {
         onUpdateRow(activeIdx, "type", type);
     }
@@ -90,7 +93,26 @@ export function PaymentDialog({
     function handleAddRow() {
         onAddRow();
         const newIdx = payments.length;
-        setTimeout(() => switchRow(newIdx), 0);
+        window.setTimeout(() => {
+            setActiveIdx(newIdx);
+            setInputBuf("");
+        }, 0);
+    }
+
+    function handleRemoveActiveRow(idx: number) {
+        const currentActiveIdx = activeIdx;
+        onRemoveRow(idx);
+
+        let nextIdx = currentActiveIdx;
+        if (idx === currentActiveIdx) {
+            nextIdx = Math.max(0, idx - 1);
+        } else if (idx < currentActiveIdx) {
+            nextIdx = currentActiveIdx - 1;
+        }
+
+        window.setTimeout(() => {
+            switchRow(nextIdx);
+        }, 0);
     }
 
     const KEYPAD = [
@@ -117,6 +139,36 @@ export function PaymentDialog({
                 </div>
 
                 <div className="p-4 space-y-3">
+                    {payments.length > 1 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            {payments.map((payment, idx) => {
+                                const isActiveRow = idx === activeIdx;
+                                return (
+                                    <div
+                                        key={`${payment.type}-${idx}`}
+                                        className={`flex items-center gap-1 rounded-full border px-2 py-1 ${isActiveRow ? "border-primary bg-primary/5" : "border-border bg-background"}`}
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() => switchRow(idx)}
+                                            className={`rounded-full px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isActiveRow ? "text-primary" : "text-foreground"}`}
+                                        >
+                                            {TYPE_LABEL[payment.type] ?? payment.type} {idx + 1}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveActiveRow(idx)}
+                                            aria-label={`ลบช่องทางชำระ ${idx + 1}`}
+                                            className="rounded-full p-1 text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
                     {/* ── Summary bar ── */}
                     <div className="rounded-2xl border bg-card grid grid-cols-2 divide-x overflow-hidden">
                         <div className="px-5 py-4">
@@ -148,14 +200,20 @@ export function PaymentDialog({
 
                         {/* Left: payment method list */}
                         <div className="space-y-2">
-                            <p className="text-xs text-muted-foreground px-1">เลือกช่องทางชำระ</p>
+                            <div className="flex items-center justify-between gap-2 px-1">
+                                <p className="text-xs text-muted-foreground">เลือกช่องทางชำระ</p>
+                                <Button type="button" size="xs" variant="outline" onClick={handleAddRow}>
+                                    <Plus className="h-3.5 w-3.5" />เพิ่มช่องทาง
+                                </Button>
+                            </div>
                             {PAYMENT_TYPES.map((pt) => {
                                 const active = activeRow?.type === pt.value;
                                 return (
                                     <button
+                                        type="button"
                                         key={pt.value}
                                         onClick={() => selectPaymentType(pt.value)}
-                                        className={`w-full rounded-xl border px-3 py-3 flex items-center gap-2.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                                        className={`w-full rounded-xl border px-3 py-3 flex items-center gap-2.5 text-left transition-[color,background-color,border-color,box-shadow,opacity,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                                             active ? "border-primary ring-1 ring-primary bg-primary/5" : "bg-card hover:bg-accent"
                                         }`}
                                     >
@@ -179,9 +237,10 @@ export function PaymentDialog({
                             <div className="grid grid-cols-3 gap-1.5">
                                 {KEYPAD.flat().map((key) => (
                                     <button
+                                        type="button"
                                         key={key}
                                         onClick={() => pressKey(key)}
-                                        className={`rounded-xl font-semibold flex items-center justify-center h-14 active:scale-95 transition-all select-none text-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                                        className={`rounded-xl font-semibold flex items-center justify-center h-14 active:scale-95 transition-[color,background-color,border-color,box-shadow,opacity,transform] select-none text-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                                             key === "⌫"
                                                 ? "text-muted-foreground hover:bg-accent border"
                                                 : key === "."

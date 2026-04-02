@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +20,33 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   CANCELLED: { label: "ยกเลิก", variant: "destructive" },
 };
 
+function getOrderPayments(detail: OrderDetail) {
+  if (Array.isArray(detail.payments) && detail.payments.length > 0) {
+    return detail.payments;
+  }
+  return detail.payment ? [detail.payment] : [];
+}
+
+function getPaymentSummary(order: Order | OrderDetail) {
+  const detailOrder = order as OrderDetail;
+  const payments = Array.isArray(detailOrder.payments) && detailOrder.payments.length > 0
+    ? detailOrder.payments
+    : detailOrder.payment
+      ? [detailOrder.payment]
+      : [];
+
+  if (payments.length === 0) {
+    return PAYMENT_LABEL[order.type] ?? order.type;
+  }
+
+  return payments
+    .map((payment) => `${PAYMENT_LABEL[payment.type] ?? payment.type} ฿${new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2 }).format(payment.amount ?? 0)}`)
+    .join(", ");
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [paymentSummaries, setPaymentSummaries] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -34,19 +59,53 @@ export default function OrdersPage() {
   const [detail, setDetail] = useState<OrderDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const confirm = useConfirm();
+  const dateRangeRef = useRef({ startDate, endDate });
 
-  const load = () => {
+  useEffect(() => {
+    dateRangeRef.current = { startDate, endDate };
+  }, [endDate, startDate]);
+
+  const load = useCallback(() => {
+    const { startDate: currentStartDate, endDate: currentEndDate } = dateRangeRef.current;
     setLoading(true);
     listOrders(
-      new Date(startDate).toISOString(),
-      new Date(endDate + "T23:59:59").toISOString()
+      new Date(currentStartDate).toISOString(),
+      new Date(currentEndDate + "T23:59:59").toISOString()
     )
       .then((data) => setOrders(Array.isArray(data) ? data : []))
       .catch(() => toast.error("โหลดข้อมูลไม่สำเร็จ — ลองใหม่อีกครั้ง"))
       .finally(() => setLoading(false));
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (orders.length === 0) {
+      setPaymentSummaries({});
+      return;
+    }
+
+    Promise.all(
+      orders.map(async (order) => {
+        try {
+          const detail = await getOrder(order.id);
+          return [order.id, getPaymentSummary(detail)] as const;
+        } catch {
+          return [order.id, PAYMENT_LABEL[order.type] ?? order.type] as const;
+        }
+      })
+    ).then((entries) => {
+      if (!cancelled) {
+        setPaymentSummaries(Object.fromEntries(entries));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orders]);
 
   async function handleView(id: string) {
     setDetailLoading(true);
@@ -71,6 +130,7 @@ export default function OrdersPage() {
   const fmtDate = (s?: string) => s ? new Date(s).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" }) : "-";
   const fmtTime = (s?: string) => s ? new Date(s).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) : "";
   const fmtDateTime = (s?: string) => s ? new Date(s).toLocaleString("th-TH", { day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "-";
+  const detailPayments = detail ? getOrderPayments(detail) : [];
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {
@@ -82,12 +142,12 @@ export default function OrdersPage() {
           o.id?.toLowerCase().includes(q) ||
           o.customerCode?.toLowerCase().includes(q) ||
           o.customerName?.toLowerCase().includes(q) ||
-          (PAYMENT_LABEL[o.type] ?? o.type).toLowerCase().includes(q)
+          (paymentSummaries[o.id] ?? PAYMENT_LABEL[o.type] ?? o.type).toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [orders, search, statusFilter]);
+  }, [orders, paymentSummaries, search, statusFilter]);
 
   const summary = useMemo(() => {
     const active = filtered.filter((o) => o.status !== "VOIDED" && o.status !== "CANCELLED");
@@ -222,7 +282,7 @@ export default function OrdersPage() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-base font-semibold tabular-nums">฿{fmt(o.total ?? 0)}</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{PAYMENT_LABEL[o.type] ?? o.type}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{paymentSummaries[o.id] ?? PAYMENT_LABEL[o.type] ?? o.type}</p>
                     </div>
                   </button>
                 );
@@ -325,19 +385,22 @@ export default function OrdersPage() {
                 {/* Payment */}
                 <div className="px-4 py-4 bg-background">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">การชำระเงิน</p>
-                  {detail.payment ? (
+                  {detailPayments.length > 0 ? (
                     <div className="rounded-xl border border-border/60 bg-card p-3 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="flex items-center gap-1.5 text-foreground">
-                          <Receipt className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-                          {PAYMENT_LABEL[detail.payment.type] ?? detail.payment.type}
-                        </span>
-                        <span className="tabular-nums font-medium">฿{fmt(detail.payment.amount)}</span>
-                      </div>
-                      {detail.payment.change > 0 && (
+                      {detailPayments.map((payment, index) => (
+                        <div key={payment.id ?? `${payment.type}-${index}`} className="flex justify-between text-sm">
+                          <span className="flex items-center gap-1.5 text-foreground">
+                            <Receipt className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                            {PAYMENT_LABEL[payment.type] ?? payment.type}
+                            {detailPayments.length > 1 ? ` ${index + 1}` : ""}
+                          </span>
+                          <span className="tabular-nums font-medium">฿{fmt(payment.amount)}</span>
+                        </div>
+                      ))}
+                      {(detailPayments[detailPayments.length - 1]?.change ?? 0) > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">เงินทอน</span>
-                          <span className="tabular-nums text-emerald-600">฿{fmt(detail.payment.change)}</span>
+                          <span className="tabular-nums text-emerald-600">฿{fmt(detailPayments[detailPayments.length - 1]?.change ?? 0)}</span>
                         </div>
                       )}
                     </div>

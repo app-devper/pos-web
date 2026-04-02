@@ -20,6 +20,18 @@ import type { ProductDetail, ProductStock, ProductUnit } from "@/types/pos";
 
 interface Branch { id: string; name: string; }
 
+function toDateTimeValue(date: string): string {
+  return `${date}T00:00:00.000`;
+}
+
+function todayDateTimeValue(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return toDateTimeValue(`${year}-${month}-${day}`);
+}
+
 export default function StockPage() {
   const [products, setProducts] = useState<ProductDetail[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -100,8 +112,8 @@ export default function StockPage() {
           productId: sheetProduct.id,
           unitId: stockForm.unitId,
           costPrice: stockForm.costPrice,
-          expireDate: editingStock.expireDate ?? new Date().toISOString(),
-          importDate: editingStock.importDate ?? new Date().toISOString(),
+          expireDate: editingStock.expireDate ?? todayDateTimeValue(),
+          importDate: editingStock.importDate ?? todayDateTimeValue(),
         });
       } else {
         await createProductStock({
@@ -110,8 +122,8 @@ export default function StockPage() {
           unitId: stockForm.unitId,
           quantity: stockForm.quantity,
           costPrice: stockForm.costPrice,
-          expireDate: new Date().toISOString(),
-          importDate: new Date().toISOString(),
+          expireDate: todayDateTimeValue(),
+          importDate: todayDateTimeValue(),
         });
       }
       toast.success(editingStock ? "อัปเดต stock แล้ว" : "เพิ่ม stock แล้ว");

@@ -1,5 +1,5 @@
 import { posApi } from "./client";
-import type { Receive, CreateReceiveRequest, UpdateReceiveRequest, ReceiveItemData, Employee, EmployeeRequest } from "@/types/pos";
+import type { Receive, CreateReceiveRequest, UpdateReceiveRequest, ReceiveItemData, Employee, EmployeeRequest, Branch } from "@/types/pos";
 
 // Receives
 export const listReceives = (startDate: string, endDate: string): Promise<Receive[]> => 
@@ -20,10 +20,10 @@ export const importReceiveToStock = (receiveId: string): Promise<Receive> =>
   posApi.patch(`/receives/${receiveId}/import`);
 
 // Branches
-export const listBranches = (): Promise<any[]> => posApi.get("/branches");
-export const getBranch = (branchId: string): Promise<any> => posApi.get(`/branches/${branchId}`);
-export const createBranch = (data: unknown): Promise<any> => posApi.post("/branches", data);
-export const updateBranch = (branchId: string, data: unknown): Promise<any> => posApi.put(`/branches/${branchId}`, data);
+export const listBranches = (): Promise<Branch[]> => posApi.get("/branches");
+export const getBranch = (branchId: string): Promise<Branch> => posApi.get(`/branches/${branchId}`);
+export const createBranch = (data: Partial<Branch>): Promise<Branch> => posApi.post("/branches", data);
+export const updateBranch = (branchId: string, data: Partial<Branch>): Promise<Branch> => posApi.put(`/branches/${branchId}`, data);
 export const deleteBranch = (branchId: string): Promise<unknown> => posApi.delete(`/branches/${branchId}`);
 export const updateBranchStatus = (branchId: string, data: { status: string }): Promise<unknown> => posApi.patch(`/branches/${branchId}/status`, data);
 

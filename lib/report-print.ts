@@ -1,4 +1,4 @@
-import type { Branch, Customer, Order, OrderDetail, PharmacyReportItem, PharmacyReportResponse, Product, ProductHistory, Receive, Setting } from "@/types/pos";
+import type { Branch, Customer, Order, OrderDetail, OrderDetailPayment, PharmacyReportItem, PharmacyReportResponse, Product, ProductHistory, Receive, Setting } from "@/types/pos";
 
 const PAYMENT_LABEL: Record<string, string> = {
   CASH: "เงินสด",
@@ -21,6 +21,30 @@ const CUSTOMER_TYPE_LABEL: Record<string, string> = {
 };
 
 const currency = new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function getOrderPayments(order: OrderDetail) {
+  if (Array.isArray(order.payments) && order.payments.length > 0) {
+    return order.payments;
+  }
+  return order.payment ? [order.payment] : [];
+}
+
+function getPaymentSummary(order: Order | OrderDetail) {
+  const detailOrder = order as OrderDetail;
+  const payments = Array.isArray(detailOrder.payments) && detailOrder.payments.length > 0
+    ? detailOrder.payments
+    : detailOrder.payment
+      ? [detailOrder.payment]
+      : [];
+
+  if (payments.length === 0) {
+    return PAYMENT_LABEL[order.type] || order.type;
+  }
+
+  return payments
+    .map((payment: OrderDetailPayment) => `${PAYMENT_LABEL[payment.type] || payment.type} ฿${currency.format(payment.amount ?? 0)}`)
+    .join(", ");
+}
 
 const fmtDateTime = (value?: string) => {
   if (!value) return "-";
@@ -186,7 +210,7 @@ export function printSalesReport(params: {
 export function printCustomerHistoryReport(params: {
   customerCode: string;
   customer?: Customer | null;
-  orders: Order[];
+  orders: Array<Order | OrderDetail>;
   setting?: Setting;
 }) {
   const { customerCode, customer, orders, setting } = params;
@@ -221,7 +245,7 @@ export function printCustomerHistoryReport(params: {
                 <td>${escapeHtml(order.code || order.id)}</td>
                 <td>${escapeHtml(fmtDateTime(order.createdDate))}</td>
                 <td>${escapeHtml(STATUS_LABEL[order.status] || order.status)}</td>
-                <td>${escapeHtml(PAYMENT_LABEL[order.type] || order.type)}</td>
+                <td>${escapeHtml(getPaymentSummary(order))}</td>
                 <td class="text-right">฿${currency.format(order.total ?? 0)}</td>
               </tr>
             `).join("")}
@@ -244,6 +268,16 @@ export function printReceiptDocument(params: {
   const { title, order, setting, branch, showTaxId = false } = params;
   const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = order.items.reduce((sum, item) => sum + (item.discount ?? 0), 0) + (order.discount ?? 0);
+  const payments = getOrderPayments(order);
+  const paymentSummary = payments.length > 0
+    ? payments.map((payment) => `${PAYMENT_LABEL[payment.type] || payment.type} ฿${currency.format(payment.amount ?? 0)}`).join(", ")
+    : order.type;
+  const receivedAmount = payments.length > 0
+    ? payments.reduce((sum, payment) => sum + (payment.amount ?? 0), 0)
+    : order.payment?.amount ?? order.total;
+  const changeAmount = payments.length > 0
+    ? payments[payments.length - 1]?.change ?? 0
+    : order.payment?.change ?? 0;
 
   const body = `
     <div class="page">
@@ -252,7 +286,7 @@ export function printReceiptDocument(params: {
         <div class="meta-card"><div class="meta-label">เลขที่เอกสาร</div><div class="meta-value">${escapeHtml(order.code || order.id)}</div></div>
         <div class="meta-card"><div class="meta-label">วันที่</div><div class="meta-value">${escapeHtml(fmtDateTime(order.createdDate))}</div></div>
         <div class="meta-card"><div class="meta-label">ลูกค้า</div><div class="meta-value">${escapeHtml(order.customerName || order.customerCode || "ลูกค้าทั่วไป")}</div></div>
-        <div class="meta-card"><div class="meta-label">ชำระเงิน</div><div class="meta-value">${escapeHtml(PAYMENT_LABEL[order.payment?.type] || order.payment?.type || order.type)}</div></div>
+        <div class="meta-card"><div class="meta-label">ชำระเงิน</div><div class="meta-value">${escapeHtml(paymentSummary)}</div></div>
       </div>
       ${showTaxId && setting?.companyTaxId ? `<div class="note">เลขประจำตัวผู้เสียภาษี: ${escapeHtml(setting.companyTaxId)}</div>` : ""}
       <div class="section">
@@ -283,8 +317,8 @@ export function printReceiptDocument(params: {
       <div class="totals">
         <div class="totals-row"><span>ยอดก่อนส่วนลด</span><span>฿${currency.format(subtotal)}</span></div>
         <div class="totals-row"><span>ส่วนลด</span><span>฿${currency.format(discount)}</span></div>
-        <div class="totals-row"><span>รับชำระ</span><span>฿${currency.format(order.payment?.amount ?? order.total)}</span></div>
-        <div class="totals-row"><span>เงินทอน</span><span>฿${currency.format(order.payment?.change ?? 0)}</span></div>
+        <div class="totals-row"><span>รับชำระ</span><span>฿${currency.format(receivedAmount)}</span></div>
+        <div class="totals-row"><span>เงินทอน</span><span>฿${currency.format(changeAmount)}</span></div>
         <div class="totals-row total"><span>ยอดสุทธิ</span><span>฿${currency.format(order.total ?? 0)}</span></div>
       </div>
       ${setting?.receiptFooter ? `<div class="section note">${escapeHtml(setting.receiptFooter)}</div>` : ""}

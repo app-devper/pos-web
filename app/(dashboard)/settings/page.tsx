@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSetting, upsertSetting } from "@/lib/pos-api";
+import { withRouteAccess } from "@/components/withRouteAccess";
 import type { SettingRequest } from "@/types/pos";
 
 const FEATURE_FLAGS = [
@@ -26,7 +27,7 @@ const EMPTY: SettingRequest = {
   features: {},
 };
 
-export default function SettingsPage() {
+function SettingsPage() {
   const [form, setForm] = useState<SettingRequest>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -128,3 +129,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+export default withRouteAccess(SettingsPage, { roles: ["ADMIN", "SUPER"] });
