@@ -182,6 +182,7 @@ export interface Order {
   totalCost: number;
   discount?: number;
   type: string;
+  payments?: OrderDetailPayment[];
   createdDate?: string;
 }
 

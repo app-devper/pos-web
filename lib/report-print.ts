@@ -1,11 +1,5 @@
-import type { Branch, Customer, Order, OrderDetail, OrderDetailPayment, PharmacyReportItem, PharmacyReportResponse, Product, ProductHistory, Receive, Setting } from "@/types/pos";
-
-const PAYMENT_LABEL: Record<string, string> = {
-  CASH: "เงินสด",
-  CREDIT: "บัตรเครดิต",
-  PROMPTPAY: "พร้อมเพย์",
-  TRANSFER: "โอนเงิน",
-};
+import type { Branch, Customer, Order, OrderDetail, PharmacyReportItem, PharmacyReportResponse, Product, ProductHistory, Receive, Setting } from "@/types/pos";
+import { getOrderPayments, getPaymentSummary } from "@/lib/payment-summary";
 
 const STATUS_LABEL: Record<string, string> = {
   ACTIVE: "สำเร็จ",
@@ -21,30 +15,6 @@ const CUSTOMER_TYPE_LABEL: Record<string, string> = {
 };
 
 const currency = new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-function getOrderPayments(order: OrderDetail) {
-  if (Array.isArray(order.payments) && order.payments.length > 0) {
-    return order.payments;
-  }
-  return order.payment ? [order.payment] : [];
-}
-
-function getPaymentSummary(order: Order | OrderDetail) {
-  const detailOrder = order as OrderDetail;
-  const payments = Array.isArray(detailOrder.payments) && detailOrder.payments.length > 0
-    ? detailOrder.payments
-    : detailOrder.payment
-      ? [detailOrder.payment]
-      : [];
-
-  if (payments.length === 0) {
-    return PAYMENT_LABEL[order.type] || order.type;
-  }
-
-  return payments
-    .map((payment: OrderDetailPayment) => `${PAYMENT_LABEL[payment.type] || payment.type} ฿${currency.format(payment.amount ?? 0)}`)
-    .join(", ");
-}
 
 const fmtDateTime = (value?: string) => {
   if (!value) return "-";
@@ -245,7 +215,7 @@ export function printCustomerHistoryReport(params: {
                 <td>${escapeHtml(order.code || order.id)}</td>
                 <td>${escapeHtml(fmtDateTime(order.createdDate))}</td>
                 <td>${escapeHtml(STATUS_LABEL[order.status] || order.status)}</td>
-                <td>${escapeHtml(getPaymentSummary(order))}</td>
+                <td>${escapeHtml(getPaymentSummary(order, (amount) => `฿${currency.format(amount)}`))}</td>
                 <td class="text-right">฿${currency.format(order.total ?? 0)}</td>
               </tr>
             `).join("")}
@@ -269,9 +239,7 @@ export function printReceiptDocument(params: {
   const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = order.items.reduce((sum, item) => sum + (item.discount ?? 0), 0) + (order.discount ?? 0);
   const payments = getOrderPayments(order);
-  const paymentSummary = payments.length > 0
-    ? payments.map((payment) => `${PAYMENT_LABEL[payment.type] || payment.type} ฿${currency.format(payment.amount ?? 0)}`).join(", ")
-    : order.type;
+  const paymentSummary = getPaymentSummary(order, (amount) => `฿${currency.format(amount)}`);
   const receivedAmount = payments.length > 0
     ? payments.reduce((sum, payment) => sum + (payment.amount ?? 0), 0)
     : order.payment?.amount ?? order.total;

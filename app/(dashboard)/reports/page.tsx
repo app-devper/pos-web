@@ -76,20 +76,11 @@ function ReportsPage() {
         getSetting().catch(() => undefined),
       ]);
       const orderList = Array.isArray(orders) ? orders : [];
-      const detailedOrders = await Promise.all(
-        orderList.map(async (order) => {
-          try {
-            return await getOrder(order.id);
-          } catch {
-            return order;
-          }
-        })
-      );
       const customer = Array.isArray(customers) ? customers.find((item) => item.code === customerCode) : undefined;
       printCustomerHistoryReport({
         customerCode,
         customer,
-        orders: detailedOrders,
+        orders: orderList,
         setting,
       });
       toast.success("เปิดเอกสารสำหรับบันทึกเป็น PDF แล้ว");

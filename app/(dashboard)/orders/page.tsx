@@ -9,10 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Trash2, Search, ShoppingCart, DollarSign, TrendingUp, Receipt, ChevronLeft, X } from "lucide-react";
 import { listOrders, deleteOrder, getOrder } from "@/lib/pos-api";
+import { PAYMENT_LABEL, getOrderPayments, getPaymentSummary } from "@/lib/payment-summary";
 import { useConfirm } from "@/components/ConfirmDialog";
 import type { Order, OrderDetail } from "@/types/pos";
 
-const PAYMENT_LABEL: Record<string, string> = { CASH: "เงินสด", CREDIT: "บัตรเครดิต", PROMPTPAY: "พร้อมเพย์", TRANSFER: "โอนเงิน" };
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   ACTIVE: { label: "สำเร็จ", variant: "default" },
   COMPLETED: { label: "สำเร็จ", variant: "default" },
@@ -20,33 +20,8 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   CANCELLED: { label: "ยกเลิก", variant: "destructive" },
 };
 
-function getOrderPayments(detail: OrderDetail) {
-  if (Array.isArray(detail.payments) && detail.payments.length > 0) {
-    return detail.payments;
-  }
-  return detail.payment ? [detail.payment] : [];
-}
-
-function getPaymentSummary(order: Order | OrderDetail) {
-  const detailOrder = order as OrderDetail;
-  const payments = Array.isArray(detailOrder.payments) && detailOrder.payments.length > 0
-    ? detailOrder.payments
-    : detailOrder.payment
-      ? [detailOrder.payment]
-      : [];
-
-  if (payments.length === 0) {
-    return PAYMENT_LABEL[order.type] ?? order.type;
-  }
-
-  return payments
-    .map((payment) => `${PAYMENT_LABEL[payment.type] ?? payment.type} ฿${new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2 }).format(payment.amount ?? 0)}`)
-    .join(", ");
-}
-
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [paymentSummaries, setPaymentSummaries] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -78,34 +53,6 @@ export default function OrdersPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (orders.length === 0) {
-      setPaymentSummaries({});
-      return;
-    }
-
-    Promise.all(
-      orders.map(async (order) => {
-        try {
-          const detail = await getOrder(order.id);
-          return [order.id, getPaymentSummary(detail)] as const;
-        } catch {
-          return [order.id, PAYMENT_LABEL[order.type] ?? order.type] as const;
-        }
-      })
-    ).then((entries) => {
-      if (!cancelled) {
-        setPaymentSummaries(Object.fromEntries(entries));
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [orders]);
 
   async function handleView(id: string) {
     setDetailLoading(true);
@@ -142,12 +89,12 @@ export default function OrdersPage() {
           o.id?.toLowerCase().includes(q) ||
           o.customerCode?.toLowerCase().includes(q) ||
           o.customerName?.toLowerCase().includes(q) ||
-          (paymentSummaries[o.id] ?? PAYMENT_LABEL[o.type] ?? o.type).toLowerCase().includes(q)
+          getPaymentSummary(o, (amount) => `฿${fmt(amount)}`).toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [orders, paymentSummaries, search, statusFilter]);
+  }, [orders, search, statusFilter]);
 
   const summary = useMemo(() => {
     const active = filtered.filter((o) => o.status !== "VOIDED" && o.status !== "CANCELLED");
@@ -282,7 +229,7 @@ export default function OrdersPage() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-base font-semibold tabular-nums">฿{fmt(o.total ?? 0)}</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{paymentSummaries[o.id] ?? PAYMENT_LABEL[o.type] ?? o.type}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{getPaymentSummary(o, (amount) => `฿${fmt(amount)}`)}</p>
                     </div>
                   </button>
                 );
