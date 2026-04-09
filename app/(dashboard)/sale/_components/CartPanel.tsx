@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, Minus, ShoppingCart, UserSearch, X, ChevronRight, Info, Heart, Tag } from "lucide-react";
 import { fmt } from "../_utils";
@@ -68,6 +69,10 @@ export const CartPanel = memo(function CartPanel({
   total,
   openPay,
 }: CartPanelProps) {
+  const itemCount = cart.length;
+  const quantityCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const hasAdjustments = promoDiscount > 0 || discount > 0;
+
   return (
     <>
       <div className="shrink-0 border-b">
@@ -106,13 +111,29 @@ export const CartPanel = memo(function CartPanel({
             <h2 className="text-base font-bold text-center">ตะกร้าสินค้า</h2>
           </div>
         )}
+        <div className="flex flex-wrap items-center gap-1.5 border-t px-3 py-2">
+          <Badge variant="secondary">{itemCount} รายการ</Badge>
+          <Badge variant="secondary">{quantityCount} ชิ้น</Badge>
+          {customerName && <Badge variant="outline">ลูกค้า: {customerName}</Badge>}
+          {linkedPatient && (
+            <Badge variant="outline">
+              ผู้ป่วย: {[linkedPatient.firstName, linkedPatient.lastName].filter(Boolean).join(" ") || linkedPatient.customerCode}
+            </Badge>
+          )}
+          {promoDiscount > 0 && <Badge variant="outline" className="text-emerald-700">โปรโมชัน -฿{fmt(promoDiscount)}</Badge>}
+          {discount > 0 && <Badge variant="outline" className="text-destructive">ส่วนลด -฿{fmt(discount)}</Badge>}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {cart.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 text-muted-foreground gap-2">
+          <div className="flex h-40 flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground">
             <ShoppingCart className="h-8 w-8 opacity-30" />
-            <p className="text-xs">เลือกสินค้าเพื่อเพิ่ม</p>
+            <p className="text-sm font-medium text-foreground">ยังไม่มีสินค้าในตะกร้า</p>
+            <p className="text-xs leading-relaxed">
+              ค้นหาสินค้าทางซ้ายแล้วแตะเพื่อเพิ่มเข้าตะกร้า
+              {multiCartEnabled ? " หรือสลับตะกร้าเพื่อแยกรายการขาย" : ""}
+            </p>
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -289,7 +310,12 @@ export const CartPanel = memo(function CartPanel({
         </div>
         <div className="flex items-center justify-between px-4 py-3">
           <span className="font-bold text-base">ยอดรวมสุทธิ</span>
-          <span className="font-bold text-base text-primary">฿{fmt(total)}</span>
+          <div className="text-right">
+            <span className="font-bold text-base text-primary">฿{fmt(total)}</span>
+            {hasAdjustments && (
+              <p className="text-[11px] text-muted-foreground">รวมหลังหักส่วนลดแล้ว</p>
+            )}
+          </div>
         </div>
         <div className="px-4 pb-4">
           <Button

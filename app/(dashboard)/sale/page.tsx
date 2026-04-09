@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Search, ShoppingCart, RefreshCw } from "lucide-react";
+import { Search, ShoppingCart, RefreshCw, X } from "lucide-react";
 import { listCategories, createOrder, checkDrugInteractions, printPrescriptionLabel } from "@/lib/pos-api";
 import { useProductCache } from "@/components/ProductCacheContext";
 import { useSettings } from "@/components/SettingsContext";
@@ -279,6 +280,11 @@ export default function SalePage() {
     });
   }, [filteredProducts]);
 
+  const selectedCategoryLabel = selectedCategory === "__all__" ? "ทั้งหมด" : selectedCategory;
+  const hasActiveProductFilters = search.trim().length > 0 || selectedCategory !== "__all__";
+  const inStockCount = useMemo(() => productGridItems.filter((item) => !item.disabled).length, [productGridItems]);
+  const cartQuantity = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
+
   return (
     <div className="-m-4 md:-m-6 flex flex-col md:flex-row h-screen border-t overflow-hidden">
       {/* ─── Left: Product grid ─── */}
@@ -296,10 +302,20 @@ export default function SalePage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="ค้นหาสินค้า / บาร์โค้ด…"
-              className="pl-9"
+              className="pl-9 pr-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="ล้างคำค้นหา"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
             <SelectTrigger className="w-28 sm:w-44">
@@ -314,9 +330,36 @@ export default function SalePage() {
           </Select>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Badge variant="secondary">พบ {filteredProducts.length} รายการ</Badge>
+          <Badge variant="secondary">พร้อมขาย {inStockCount} รายการ</Badge>
+          <Badge variant="outline">หมวด: {selectedCategoryLabel}</Badge>
+          {cart.length > 0 && <Badge variant="outline">ในตะกร้า {cartQuantity} ชิ้น</Badge>}
+          {hasActiveProductFilters && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => {
+                setSearch("");
+                setSelectedCategory("__all__");
+              }}
+            >
+              ล้างตัวกรองสินค้า
+            </Button>
+          )}
+        </div>
+
         {/* Product cards */}
         <div className="flex-1 overflow-y-auto">
-          <ProductGrid items={productGridItems} loading={loadingProducts} onAddToCart={addToCart} />
+          <ProductGrid
+            items={productGridItems}
+            loading={loadingProducts}
+            onAddToCart={addToCart}
+            searchTerm={search}
+            selectedCategoryLabel={selectedCategoryLabel}
+            totalItems={filteredProducts.length}
+          />
         </div>
       </div>
 
@@ -369,7 +412,7 @@ export default function SalePage() {
               )}
             </div>
             <span className="text-sm font-medium">
-              {cart.length > 0 ? `${cart.length} รายการ` : "ตะกร้าว่าง"}
+              {cart.length > 0 ? `${cart.length} รายการ / ${cartQuantity} ชิ้น` : "ตะกร้าว่าง"}
             </span>
           </div>
           <span className="font-bold text-primary">฿{fmt(total)}</span>

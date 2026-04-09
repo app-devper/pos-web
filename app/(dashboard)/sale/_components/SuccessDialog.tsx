@@ -1,6 +1,7 @@
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useMemo } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tag } from "lucide-react";
 import type { Order, OrderPayment } from "@/types/pos";
@@ -28,15 +29,27 @@ export function SuccessDialog({
     prescriptionLabelEnabled: boolean;
     onPrintLabel: (orderId: string, size: "8x5" | "5x3") => void;
 }) {
+    const paymentsTotal = useMemo(
+        () => payments.reduce((sum, payment) => sum + payment.amount, 0),
+        [payments]
+    );
+    const displayTotal = order?.total ?? Math.max(0, paymentsTotal - change);
+    const displayCode = order?.code || order?.id || "-";
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
-                <DialogHeader><DialogTitle>บันทึกคำสั่งซื้อสำเร็จ</DialogTitle></DialogHeader>
+                <DialogHeader>
+                    <DialogTitle>บันทึกคำสั่งซื้อสำเร็จ</DialogTitle>
+                    <DialogDescription>
+                        ตรวจสอบเลขที่คำสั่งซื้อและยอดรับชำระก่อนปิดหน้าต่างนี้
+                    </DialogDescription>
+                </DialogHeader>
                 <div className="space-y-2 text-sm">
                     <p className="text-muted-foreground">เลขที่คำสั่งซื้อ</p>
-                    <p className="font-mono font-semibold">{order?.code ?? "-"}</p>
+                    <p className="font-mono font-semibold">{displayCode}</p>
                     <p className="text-muted-foreground">ยอดรวม</p>
-                    <p className="font-semibold text-primary text-lg">฿{fmt(order?.total ?? 0)}</p>
+                    <p className="font-semibold text-primary text-lg">฿{fmt(displayTotal)}</p>
                     {payments.length > 0 && (
                         <>
                             <p className="text-muted-foreground pt-1">การชำระเงิน</p>

@@ -40,6 +40,7 @@ export function PaymentDialog({
     const [activeIdx, setActiveIdx] = useState(0);
     const activeRow = payments[activeIdx] ?? payments[0];
     const change = Math.max(0, paymentsTotal - total);
+    const remainingForActive = Math.max(0, total - (paymentsTotal - (activeRow?.amount ?? 0)));
 
     const [inputBuf, setInputBuf] = useState("");
     const paymentsRef = useRef(payments);
@@ -64,6 +65,12 @@ export function PaymentDialog({
         const val = parseFloat(buf) || 0;
         updater(idx, "amount", val);
     }, []);
+
+    const setActiveAmount = useCallback((amount: number) => {
+        const next = amount > 0 ? amount.toString() : "";
+        setInputBuf(next);
+        onUpdateRow(activeIdx, "amount", amount);
+    }, [activeIdx, onUpdateRow]);
 
     function pressKey(key: string) {
         let next = inputBuf;
@@ -181,11 +188,32 @@ export function PaymentDialog({
                         </div>
                     </div>
 
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={() => setActiveAmount(remainingForActive)}>
+                            ใส่ยอดคงเหลือ
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setActiveAmount(total)}>
+                            ใส่เต็มยอด
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setActiveAmount(0)}>
+                            ล้างยอดช่องนี้
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                            คงเหลืออีก ฿{fmt(Math.max(0, total - paymentsTotal))}
+                        </span>
+                    </div>
+
                     {/* ── ยอดชำระ / เงินทอน ── */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                         <div className="rounded-2xl bg-blue-600 text-white px-5 py-3">
                             <p className="text-sm font-medium opacity-80">ยอดที่ต้องชำระ</p>
                             <p className="text-right text-2xl font-bold mt-2 tabular-nums">฿{fmt(total)}</p>
+                        </div>
+                        <div className="rounded-2xl bg-slate-700 text-white px-5 py-3">
+                            <p className="text-sm font-medium opacity-80">ยังขาดอีก</p>
+                            <p className="text-right text-2xl font-bold mt-2 tabular-nums">
+                                ฿{fmt(Math.max(0, total - paymentsTotal))}
+                            </p>
                         </div>
                         <div className={`rounded-2xl text-white px-5 py-3 ${change > 0 ? "bg-emerald-500" : "bg-orange-400"}`}>
                             <p className="text-sm font-medium opacity-80">เงินทอน</p>

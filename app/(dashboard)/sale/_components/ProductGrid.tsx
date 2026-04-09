@@ -22,12 +22,18 @@ interface ProductGridProps {
   items: ProductGridItem[];
   loading: boolean;
   onAddToCart: (product: ProductDetail) => void;
+  searchTerm: string;
+  selectedCategoryLabel: string;
+  totalItems: number;
 }
 
 export const ProductGrid = memo(function ProductGrid({
   items,
   loading,
   onAddToCart,
+  searchTerm,
+  selectedCategoryLabel,
+  totalItems,
 }: ProductGridProps) {
   if (loading) {
     return (
@@ -38,10 +44,23 @@ export const ProductGrid = memo(function ProductGrid({
   }
 
   if (items.length === 0) {
+    const hasSearch = searchTerm.trim().length > 0;
+    const hasCategory = selectedCategoryLabel !== "ทั้งหมด";
+
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2 text-center">
         <ShoppingCart className="h-10 w-10 opacity-30" />
-        <p className="text-sm">ไม่พบสินค้า</p>
+        <p className="text-sm font-medium">ไม่พบสินค้าที่ตรงเงื่อนไข</p>
+        {(hasSearch || hasCategory) ? (
+          <p className="max-w-sm text-xs leading-relaxed">
+            {hasSearch ? `ลองค้นหาใหม่ด้วยคำว่า "${searchTerm}"` : "ลองเปลี่ยนหมวดหมู่ที่เลือก"}
+            {hasCategory ? ` ในหมวด ${selectedCategoryLabel}` : ""}
+          </p>
+        ) : (
+          <p className="max-w-sm text-xs leading-relaxed">
+            ยังไม่มีสินค้าให้ขายในรายการนี้
+          </p>
+        )}
       </div>
     );
   }
@@ -65,6 +84,11 @@ export const ProductGrid = memo(function ProductGrid({
           <p className={`text-xs font-medium ${item.qtyColor}`}>{item.disabled ? "สินค้าหมด" : `คงเหลือ: ${item.qty}`}</p>
         </button>
       ))}
+      {totalItems > items.length && (
+        <div className="col-span-full rounded-lg border border-dashed bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          แสดง {items.length} จาก {totalItems} รายการที่ค้นพบ
+        </div>
+      )}
     </div>
   );
 });

@@ -1,8 +1,11 @@
 import { posApi } from "./client";
 import type { Order, OrderDetail, CreateOrderRequest } from "@/types/pos";
 
-export const createOrder = (data: CreateOrderRequest): Promise<Order> =>
-  posApi.post("/orders", data);
+export const createOrder = async (data: CreateOrderRequest): Promise<Order> => {
+  const response = await posApi.post("/orders", data) as unknown;
+  const payload = response as Order | { data?: Order };
+  return "data" in payload && payload.data ? payload.data : payload as Order;
+};
 
 export const listOrders = (startDate: string, endDate: string): Promise<Order[]> =>
   posApi.get("/orders", { params: { startDate, endDate } });
