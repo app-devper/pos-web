@@ -10,8 +10,12 @@ import { Badge } from "@/components/ui/badge";
 
 function today() {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const localDate = `${year}-${month}-${day}`;
+  const start = `${localDate}T00:00:00.000`;
+  const end = `${localDate}T23:59:59.999`;
   return { start, end };
 }
 

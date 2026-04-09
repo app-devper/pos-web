@@ -16,10 +16,14 @@ import { getPaymentSummary } from "@/lib/payment-summary";
 import type { Customer, CustomerRequest, Order } from "@/types/pos";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { CUSTOMER_TYPE_LABEL, CUSTOMER_TYPES } from "@/app/(dashboard)/sale/_utils";
+import { hasPermission } from "@/lib/rbac";
 
 const EMPTY: CustomerRequest = { name: "", customerType: "General", address: "", phone: "", email: "" };
 
 export default function CustomersPage() {
+  const canCreateCustomer = hasPermission("customers:create");
+  const canUpdateCustomer = hasPermission("customers:update");
+  const canDeleteCustomer = hasPermission("customers:delete");
   const [items, setItems] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -50,6 +54,8 @@ export default function CustomersPage() {
   }
 
   async function handleSave() {
+    if (editing && !canUpdateCustomer) return toast.error("คุณไม่มีสิทธิ์แก้ไขลูกค้า");
+    if (!editing && !canCreateCustomer) return toast.error("คุณไม่มีสิทธิ์เพิ่มลูกค้า");
     if (!form.name.trim()) return toast.error("กรุณากรอกชื่อลูกค้า");
     setSaving(true);
     try {
@@ -62,12 +68,14 @@ export default function CustomersPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!canDeleteCustomer) return toast.error("คุณไม่มีสิทธิ์ลบลูกค้า");
     if (!(await confirm({ description: "ลบลูกค้านี้?", destructive: true }))) return;
     try { await deleteCustomer(id); toast.success("ลบแล้ว"); load(); }
     catch { toast.error("ลบไม่สำเร็จ"); }
   }
 
   async function toggleStatus(c: Customer) {
+    if (!canUpdateCustomer) return toast.error("คุณไม่มีสิทธิ์แก้ไขสถานะลูกค้า");
     const next = c.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
     try { await updateCustomerStatus(c.id, { status: next }); toast.success("อัปเดตสถานะแล้ว"); load(); }
     catch { toast.error("ไม่สำเร็จ"); }
@@ -118,7 +126,9 @@ export default function CustomersPage() {
                 <h1 className="text-xl sm:text-2xl font-bold">ลูกค้า</h1>
                 <p className="text-sm text-muted-foreground">จัดการข้อมูลลูกค้า ค้นหารายชื่อ และดูประวัติการซื้อได้จากหน้าเดียว</p>
               </div>
-              <Button onClick={openCreate} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />เพิ่มลูกค้า</Button>
+              {canCreateCustomer && (
+                <Button onClick={openCreate} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />เพิ่มลูกค้า</Button>
+              )}
             </div>
 
             <Card className="rounded-2xl">
@@ -170,12 +180,18 @@ export default function CustomersPage() {
                       <TableCell><Badge variant={c.status === "ACTIVE" ? "default" : "secondary"}>{c.status ?? "-"}</Badge></TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
-                          <Button size="icon-sm" variant="ghost" title="เปลี่ยนสถานะ" aria-label="เปลี่ยนสถานะ" onClick={() => toggleStatus(c)}><ToggleLeft className="h-4 w-4" /></Button>
+                          {canUpdateCustomer && (
+                            <Button size="icon-sm" variant="ghost" title="เปลี่ยนสถานะ" aria-label="เปลี่ยนสถานะ" onClick={() => toggleStatus(c)}><ToggleLeft className="h-4 w-4" /></Button>
+                          )}
                           <Button size="icon-sm" variant="ghost" aria-label="ดูประวัติการซื้อ" onClick={() => openHistory(c)} disabled={!c.code}>
                             <Receipt className="h-4 w-4" />
                           </Button>
-                          <Button size="icon-sm" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
-                          <Button size="icon-sm" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(c.id)}><Trash2 className="h-4 w-4" /></Button>
+                          {canUpdateCustomer && (
+                            <Button size="icon-sm" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
+                          )}
+                          {canDeleteCustomer && (
+                            <Button size="icon-sm" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(c.id)}><Trash2 className="h-4 w-4" /></Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -277,7 +293,7 @@ export default function CustomersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
+            <Button onClick={handleSave} disabled={saving || (editing ? !canUpdateCustomer : !canCreateCustomer)}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

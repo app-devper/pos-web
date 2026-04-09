@@ -7,8 +7,8 @@ import type {
 
 // Dispensing Logs
 export const listDispensingLogs = (): Promise<DispensingLog[]> => posApi.get("/dispensing-logs");
-export const getDispensingLog = (id: string): Promise<unknown> => posApi.get(`/dispensing-logs/${id}`);
-export const getDispensingLogsByPatient = (patientId: string): Promise<unknown> => posApi.get(`/dispensing-logs/patient/${patientId}`);
+export const getDispensingLog = (id: string): Promise<DispensingLog> => posApi.get(`/dispensing-logs/${id}`);
+export const getDispensingLogsByPatient = (patientId: string): Promise<DispensingLog[]> => posApi.get(`/dispensing-logs/patient/${patientId}`);
 export const createDispensingLog = (data: DispensingLogRequest): Promise<DispensingLog> => posApi.post("/dispensing-logs", data);
 
 // Stock Transfers

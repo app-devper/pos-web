@@ -18,6 +18,7 @@ import { ProductDetailProvider } from "./_components/ProductDetailContext";
 import { printPriceListReport, printPriceTagsReport } from "@/lib/report-print";
 import type { ProductDetail, CreateProductRequest, Category } from "@/types/pos";
 import { Combobox } from "@/components/ui/combobox";
+import { hasPermission } from "@/lib/rbac";
 
 const UNIT_PRESETS = [
   "เม็ด", "แคปซูล", "แผง", "กล่อง", "ขวด", "หลอด", "ซอง", "ถุง",
@@ -55,6 +56,10 @@ const EMPTY_UNIT: UnitForm = { unit: "", price: 0, costPrice: 0, barcode: "", sk
 
 export default function ProductsPage() {
   const { products: items, loading, refresh } = useProductCache();
+  const canCreateProduct = hasPermission("products:create");
+  const canUpdateProduct = hasPermission("products:update");
+  const canDeleteProduct = hasPermission("products:delete");
+  const canReadReports = hasPermission("reports:read");
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
   const [sortBalance, setSortBalance] = useState(false);
@@ -97,6 +102,7 @@ export default function ProductsPage() {
   }
 
   function openCreate() {
+    if (!canCreateProduct) return;
     setEditing(null);
     const defaultCat = categories.find((c) => c.isDefault)?.name ?? categories[0]?.name ?? "";
     setForm({ ...EMPTY, category: defaultCat });
@@ -104,6 +110,7 @@ export default function ProductsPage() {
     setFormOpen(true);
   }
   function openEdit(p: ProductDetail) {
+    if (!canUpdateProduct) return;
     setEditing(p);
     const defaultCat = categories.find((c) => c.isDefault)?.name ?? categories[0]?.name ?? "";
     setForm({ name: p.name, nameEn: p.nameEn ?? "", description: p.description ?? "", price: p.price, costPrice: p.costPrice, unit: p.unit, serialNumber: p.serialNumber, category: p.category || defaultCat, status: p.status || "ACTIVE", minStock: p.minStock ?? 0, drugRegistrations: p.drugRegistrations ?? [], drugInfo: p.drugInfo ?? undefined });
@@ -117,6 +124,8 @@ export default function ProductsPage() {
   }
 
   async function handleSave() {
+    if (editing && !canUpdateProduct) return;
+    if (!editing && !canCreateProduct) return;
     if (!form.name) return toast.error("กรุณากรอกชื่อสินค้า");
     setSaving(true);
     try {
@@ -392,7 +401,7 @@ export default function ProductsPage() {
             {/* Form footer */}
             <div className="shrink-0 border-t px-4 sm:px-6 py-4 flex justify-end gap-2">
               <Button variant="outline" onClick={closeForm}>ยกเลิก</Button>
-              <Button onClick={handleSave} disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
+              <Button onClick={handleSave} disabled={saving || (editing ? !canUpdateProduct : !canCreateProduct)}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
             </div>
           </div>
         ) : !selected ? (
@@ -406,18 +415,24 @@ export default function ProductsPage() {
               <div>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">จัดการคลังสินค้า</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={openCreate} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                  {canCreateProduct && (
+                    <button onClick={openCreate} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><Plus className="h-4 w-4" /></div>
                     <div className="min-w-0"><p className="text-sm font-medium">เพิ่มสินค้า</p><p className="text-xs text-muted-foreground truncate">สร้างรายการใหม่</p></div>
                   </button>
-                  <button onClick={() => setCsvOpen(true)} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                  )}
+                  {canCreateProduct && (
+                    <button onClick={() => setCsvOpen(true)} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-orange-500/10 text-orange-600"><Upload className="h-4 w-4" /></div>
                     <div className="min-w-0"><p className="text-sm font-medium">นำเข้า CSV</p><p className="text-xs text-muted-foreground truncate">นำเข้าสินค้าจากไฟล์</p></div>
                   </button>
-                  <button onClick={() => { downloadReport("/reports/stocks/excel", {}, "stock-report").catch(() => toast.error("ดาวน์โหลดไม่สำเร็จ")); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600"><Download className="h-4 w-4" /></div>
-                    <div className="min-w-0"><p className="text-sm font-medium">ส่งออก Excel</p><p className="text-xs text-muted-foreground truncate">รายงานสต็อกทั้งหมด</p></div>
-                  </button>
+                  )}
+                  {canReadReports && (
+                    <button onClick={() => { downloadReport("/reports/stocks/excel", {}, "stock-report").catch(() => toast.error("ดาวน์โหลดไม่สำเร็จ")); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600"><Download className="h-4 w-4" /></div>
+                      <div className="min-w-0"><p className="text-sm font-medium">ส่งออก Excel</p><p className="text-xs text-muted-foreground truncate">รายงานสต็อกทั้งหมด</p></div>
+                    </button>
+                  )}
                   <button onClick={() => refresh()} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-sky-500/10 text-sky-600"><RefreshCw className="h-4 w-4" /></div>
                     <div className="min-w-0"><p className="text-sm font-medium">รีเฟรช</p><p className="text-xs text-muted-foreground truncate">โหลดข้อมูลใหม่</p></div>
@@ -448,21 +463,30 @@ export default function ProductsPage() {
               <div>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">รายงาน</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <Link href="/reports" className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-indigo-500/10 text-indigo-600"><ArrowRightLeft className="h-4 w-4" /></div>
-                    <div className="min-w-0"><p className="text-sm font-medium">สินค้าเข้า-ออก</p><p className="text-xs text-muted-foreground truncate">รายงานความเคลื่อนไหว</p></div>
-                  </Link>
-                  <button onClick={() => { downloadReport("/reports/stocks/excel", {}, "stock-report").catch(() => toast.error("ดาวน์โหลดไม่สำเร็จ")); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-teal-500/10 text-teal-600"><FileSpreadsheet className="h-4 w-4" /></div>
-                    <div className="min-w-0"><p className="text-sm font-medium">รายงานสต็อก</p><p className="text-xs text-muted-foreground truncate">สรุปยอดคงเหลือ Excel</p></div>
-                  </button>
+                  {canReadReports && (
+                    <Link href="/reports" className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-indigo-500/10 text-indigo-600"><ArrowRightLeft className="h-4 w-4" /></div>
+                      <div className="min-w-0"><p className="text-sm font-medium">สินค้าเข้า-ออก</p><p className="text-xs text-muted-foreground truncate">รายงานความเคลื่อนไหว</p></div>
+                    </Link>
+                  )}
+                  {canReadReports && (
+                    <button onClick={() => { downloadReport("/reports/stocks/excel", {}, "stock-report").catch(() => toast.error("ดาวน์โหลดไม่สำเร็จ")); }} className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-teal-500/10 text-teal-600"><FileSpreadsheet className="h-4 w-4" /></div>
+                      <div className="min-w-0"><p className="text-sm font-medium">รายงานสต็อก</p><p className="text-xs text-muted-foreground truncate">สรุปยอดคงเหลือ Excel</p></div>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         ) : (
           <ProductDetailProvider key={detailKey} product={selected}>
-            <ProductDetailPanel onEdit={() => openEdit(selected)} onBack={() => setSelected(null)} />
+            <ProductDetailPanel
+              onEdit={() => openEdit(selected)}
+              onBack={() => setSelected(null)}
+              canUpdate={canUpdateProduct}
+              canDelete={canDeleteProduct}
+            />
           </ProductDetailProvider>
         )}
       </div>

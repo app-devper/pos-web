@@ -25,6 +25,13 @@ interface LotForm {
 
 const EMPTY: LotForm = { productId: "", lotNumber: "", quantity: 0, expireDate: "", costPrice: 0 };
 
+function formatLocalDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function generateLotNumber() {
   const now = new Date();
   const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
@@ -48,8 +55,8 @@ function BatchesPage() {
   const load = () => {
     setLoading(true);
     const now = new Date();
-    const start = new Date(now.getFullYear() - 2, 0, 1).toISOString();
-    const end = new Date(now.getFullYear() + 5, 11, 31).toISOString();
+    const start = `${now.getFullYear() - 2}-01-01T00:00:00.000`;
+    const end = `${now.getFullYear() + 5}-12-31T23:59:59.999`;
     listLots(start, end)
       .then((data) => setItems(Array.isArray(data) ? data : []))
       .catch(() => toast.error("โหลดข้อมูลไม่สำเร็จ"))
@@ -65,7 +72,7 @@ function BatchesPage() {
       productId: lot.productId,
       lotNumber: lot.lotNumber,
       quantity: lot.quantity,
-      expireDate: lot.expireDate ? lot.expireDate.slice(0, 10) : "",
+      expireDate: lot.expireDate ? formatLocalDateInput(new Date(lot.expireDate)) : "",
       costPrice: lot.costPrice,
     });
     setOpen(true);

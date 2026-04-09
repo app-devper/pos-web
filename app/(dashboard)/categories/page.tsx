@@ -13,8 +13,12 @@ import { Plus, Pencil, Trash2, Star } from "lucide-react";
 import { listCategories, createCategory, updateCategory, deleteCategory, setDefaultCategory } from "@/lib/pos-api";
 import { useConfirm } from "@/components/ConfirmDialog";
 import type { Category } from "@/types/pos";
+import { hasPermission } from "@/lib/rbac";
 
 export default function CategoriesPage() {
+  const canCreateCategory = hasPermission("products:create");
+  const canUpdateCategory = hasPermission("products:update");
+  const canDeleteCategory = hasPermission("products:delete");
   const [items, setItems] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -38,6 +42,8 @@ export default function CategoriesPage() {
   function openEdit(c: Category) { setEditing(c); setName(c.name); setValue(c.value ?? ""); setOpen(true); }
 
   async function handleSave() {
+    if (editing && !canUpdateCategory) return toast.error("คุณไม่มีสิทธิ์แก้ไขหมวดหมู่");
+    if (!editing && !canCreateCategory) return toast.error("คุณไม่มีสิทธิ์เพิ่มหมวดหมู่");
     if (!name.trim()) return toast.error("กรุณากรอกชื่อหมวดหมู่");
     const val = value.trim() || name.trim();
     const payload = { name: name.trim(), value: val };
@@ -53,12 +59,14 @@ export default function CategoriesPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!canDeleteCategory) return toast.error("คุณไม่มีสิทธิ์ลบหมวดหมู่");
     if (!(await confirm({ description: "ลบหมวดหมู่นี้?", destructive: true }))) return;
     try { await deleteCategory(id); toast.success("ลบแล้ว"); load(); }
     catch { toast.error("ลบไม่สำเร็จ"); }
   }
 
   async function handleSetDefault(id: string) {
+    if (!canUpdateCategory) return toast.error("คุณไม่มีสิทธิ์ตั้งค่าหมวดหมู่");
     try { await setDefaultCategory(id); toast.success("ตั้งเป็นค่าเริ่มต้นแล้ว"); load(); }
     catch { toast.error("ไม่สำเร็จ"); }
   }
@@ -67,7 +75,9 @@ export default function CategoriesPage() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <h1 className="text-xl sm:text-2xl font-bold">หมวดหมู่</h1>
-        <Button onClick={openCreate} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />เพิ่มหมวดหมู่</Button>
+        {canCreateCategory && (
+          <Button onClick={openCreate} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />เพิ่มหมวดหมู่</Button>
+        )}
       </div>
       <Card>
         <CardContent className="p-0">
@@ -93,9 +103,9 @@ export default function CategoriesPage() {
                     <TableCell>{(c.isDefault || c.default) && <Badge>ค่าเริ่มต้น</Badge>}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        {!c.isDefault && <Button size="icon" variant="ghost" title="ตั้งเป็นค่าเริ่มต้น" aria-label="ตั้งเป็นค่าเริ่มต้น" onClick={() => handleSetDefault(c.id)}><Star className="h-4 w-4" /></Button>}
-                        <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(c.id)}><Trash2 className="h-4 w-4" /></Button>
+                        {!c.isDefault && canUpdateCategory && <Button size="icon" variant="ghost" title="ตั้งเป็นค่าเริ่มต้น" aria-label="ตั้งเป็นค่าเริ่มต้น" onClick={() => handleSetDefault(c.id)}><Star className="h-4 w-4" /></Button>}
+                        {canUpdateCategory && <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>}
+                        {canDeleteCategory && <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(c.id)}><Trash2 className="h-4 w-4" /></Button>}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -122,7 +132,7 @@ export default function CategoriesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
+            <Button onClick={handleSave} disabled={saving || (editing ? !canUpdateCategory : !canCreateCategory)}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

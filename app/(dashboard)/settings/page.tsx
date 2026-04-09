@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSetting, upsertSetting } from "@/lib/pos-api";
 import { withRouteAccess } from "@/components/withRouteAccess";
 import type { SettingRequest } from "@/types/pos";
+import { hasPermission } from "@/lib/rbac";
 
 const FEATURE_FLAGS = [
   { key: "drugInteractionAlert", label: "แจ้งเตือนยาตีกัน", desc: "ตรวจสอบปฏิกิริยาระหว่างยาอัตโนมัติขณะขาย" },
@@ -28,6 +29,7 @@ const EMPTY: SettingRequest = {
 };
 
 function SettingsPage() {
+  const canUpdateSettings = hasPermission("settings:update");
   const [form, setForm] = useState<SettingRequest>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,6 +52,7 @@ function SettingsPage() {
   }, []);
 
   async function handleSave() {
+    if (!canUpdateSettings) return;
     setSaving(true);
     try {
       await upsertSetting(form);
@@ -70,20 +73,20 @@ function SettingsPage() {
       <Card>
         <CardHeader><CardTitle className="text-base">ข้อมูลกิจการ</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1"><Label>ชื่อกิจการ</Label><Input value={form.companyName} onChange={f("companyName")} /></div>
-          <div className="space-y-1"><Label>ที่อยู่</Label><Textarea value={form.companyAddress} onChange={f("companyAddress")} rows={2} /></div>
+          <div className="space-y-1"><Label>ชื่อกิจการ</Label><Input value={form.companyName} onChange={f("companyName")} disabled={!canUpdateSettings} /></div>
+          <div className="space-y-1"><Label>ที่อยู่</Label><Textarea value={form.companyAddress} onChange={f("companyAddress")} rows={2} disabled={!canUpdateSettings} /></div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><Label>โทรศัพท์</Label><Input value={form.companyPhone} onChange={f("companyPhone")} /></div>
-            <div className="space-y-1"><Label>เลขประจำตัวผู้เสียภาษี</Label><Input value={form.companyTaxId} onChange={f("companyTaxId")} /></div>
+            <div className="space-y-1"><Label>โทรศัพท์</Label><Input value={form.companyPhone} onChange={f("companyPhone")} disabled={!canUpdateSettings} /></div>
+            <div className="space-y-1"><Label>เลขประจำตัวผู้เสียภาษี</Label><Input value={form.companyTaxId} onChange={f("companyTaxId")} disabled={!canUpdateSettings} /></div>
           </div>
-          <div className="space-y-1"><Label>URL โลโก้</Label><Input value={form.logoUrl} onChange={f("logoUrl")} /></div>
+          <div className="space-y-1"><Label>URL โลโก้</Label><Input value={form.logoUrl} onChange={f("logoUrl")} disabled={!canUpdateSettings} /></div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-base">ใบเสร็จ</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1"><Label>ข้อความท้ายใบเสร็จ</Label><Textarea value={form.receiptFooter} onChange={f("receiptFooter")} rows={3} /></div>
+          <div className="space-y-1"><Label>ข้อความท้ายใบเสร็จ</Label><Textarea value={form.receiptFooter} onChange={f("receiptFooter")} rows={3} disabled={!canUpdateSettings} /></div>
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -91,6 +94,7 @@ function SettingsPage() {
               checked={form.showCredit ?? false}
               onChange={(e) => setForm((p) => ({ ...p, showCredit: e.target.checked }))}
               className="h-4 w-4"
+              disabled={!canUpdateSettings}
             />
             <Label htmlFor="showCredit">แสดงยอดเครดิตในใบเสร็จ</Label>
           </div>
@@ -100,7 +104,7 @@ function SettingsPage() {
       <Card>
         <CardHeader><CardTitle className="text-base">PromptPay</CardTitle></CardHeader>
         <CardContent>
-          <div className="space-y-1"><Label>หมายเลข PromptPay</Label><Input value={form.promptPayId} onChange={f("promptPayId")} placeholder="0812345678 หรือ เลขนิติบุคคล" /></div>
+          <div className="space-y-1"><Label>หมายเลข PromptPay</Label><Input value={form.promptPayId} onChange={f("promptPayId")} placeholder="0812345678 หรือ เลขนิติบุคคล" disabled={!canUpdateSettings} /></div>
         </CardContent>
       </Card>
 
@@ -115,6 +119,7 @@ function SettingsPage() {
                 checked={form.features?.[ff.key] ?? false}
                 onChange={(e) => setForm((p) => ({ ...p, features: { ...p.features, [ff.key]: e.target.checked } }))}
                 className="h-4 w-4 mt-0.5"
+                disabled={!canUpdateSettings}
               />
               <div>
                 <Label htmlFor={`ff-${ff.key}`} className="cursor-pointer">{ff.label}</Label>
@@ -125,7 +130,7 @@ function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? "กำลังบันทึก…" : "บันทึกการตั้งค่า"}</Button>
+      <Button onClick={handleSave} disabled={saving || !canUpdateSettings} className="w-full">{saving ? "กำลังบันทึก…" : "บันทึกการตั้งค่า"}</Button>
     </div>
   );
 }

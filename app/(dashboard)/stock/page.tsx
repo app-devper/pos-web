@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,15 +10,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Pencil, Trash2, Layers, ArrowUpDown } from "lucide-react";
 import {
   listProducts, getProductStocks, createProductStock,
   updateProductStock, deleteProductStock, updateStockQuantity,
   getProductUnits, listBranches,
 } from "@/lib/pos-api";
-import type { ProductDetail, ProductStock, ProductUnit } from "@/types/pos";
-
-interface Branch { id: string; name: string; }
+import type { Branch, ProductDetail, ProductStock, ProductUnit } from "@/types/pos";
+import { useConfirm } from "@/components/ConfirmDialog";
+import { hasPermission } from "@/lib/rbac";
 
 function toDateTimeValue(date: string): string {
   return `${date}T00:00:00.000`;
@@ -33,6 +34,8 @@ function todayDateTimeValue(): string {
 }
 
 export default function StockPage() {
+  const canUpdateStock = hasPermission("products:update");
+  const canDeleteStock = hasPermission("products:delete");
   const [products, setProducts] = useState<ProductDetail[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [search, setSearch] = useState("");
@@ -43,6 +46,10 @@ export default function StockPage() {
   const [stocks, setStocks] = useState<ProductStock[]>([]);
   const [units, setUnits] = useState<ProductUnit[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
+  const [branchFilter, setBranchFilter] = useState("ALL");
+  const [unitFilter, setUnitFilter] = useState("ALL");
+  const [quickFilter, setQuickFilter] = useState<"ALL" | "LOW" | "EXPIRING" | "EMPTY">("ALL");
+  const [sortMode, setSortMode] = useState<"DEFAULT" | "QTY_ASC" | "QTY_DESC" | "BRANCH">("DEFAULT");
 
   // Add/Edit stock dialog
   const [stockOpen, setStockOpen] = useState(false);
@@ -55,6 +62,7 @@ export default function StockPage() {
   const [adjustTarget, setAdjustTarget] = useState<ProductStock | null>(null);
   const [adjustQty, setAdjustQty] = useState(0);
   const [adjusting, setAdjusting] = useState(false);
+  const confirm = useConfirm();
 
   const fmtDate = (value?: string) => {
     if (!value) return "-";
@@ -88,16 +96,28 @@ export default function StockPage() {
     setSheetProduct(p);
     setStocks([]);
     setUnits([]);
+    setBranchFilter("ALL");
+    setUnitFilter("ALL");
+    setQuickFilter("ALL");
+    setSortMode("DEFAULT");
     loadStocks(p.id);
   }
 
   function openAddStock() {
+    if (!canUpdateStock) return;
+    const defaultUnit = units.find((unit) => unit.id === unitFilter) ?? units[0];
     setEditingStock(null);
-    setStockForm({ branchId: branches[0]?.id ?? "", unitId: units[0]?.id ?? "", quantity: 0, costPrice: 0 });
+    setStockForm({
+      branchId: branchFilter !== "ALL" ? branchFilter : branches[0]?.id ?? "",
+      unitId: defaultUnit?.id ?? "",
+      quantity: 0,
+      costPrice: defaultUnit?.costPrice ?? 0,
+    });
     setStockOpen(true);
   }
 
   function openEditStock(s: ProductStock) {
+    if (!canUpdateStock) return;
     setEditingStock(s);
     setStockForm({ branchId: s.branchId, unitId: s.unitId, quantity: s.quantity, costPrice: s.costPrice });
     setStockOpen(true);
@@ -105,6 +125,7 @@ export default function StockPage() {
 
   async function handleSaveStock() {
     if (!sheetProduct) return;
+    if (!canUpdateStock) return;
     setSavingStock(true);
     try {
       if (editingStock) {
@@ -139,7 +160,9 @@ export default function StockPage() {
   }
 
   async function handleDeleteStock(stockId: string) {
-    if (!sheetProduct || !confirm("ลบ stock นี้?")) return;
+    if (!sheetProduct) return;
+    if (!canDeleteStock) return;
+    if (!(await confirm({ description: "ลบ stock นี้?", destructive: true }))) return;
     try {
       await deleteProductStock(stockId);
       toast.success("ลบแล้ว");
@@ -148,6 +171,7 @@ export default function StockPage() {
   }
 
   function openAdjust(s: ProductStock) {
+    if (!canUpdateStock) return;
     setAdjustTarget(s);
     setAdjustQty(s.quantity);
     setAdjustOpen(true);
@@ -155,6 +179,7 @@ export default function StockPage() {
 
   async function handleAdjust() {
     if (!adjustTarget || !sheetProduct) return;
+    if (!canUpdateStock) return;
     setAdjusting(true);
     try {
       await updateStockQuantity(adjustTarget.id, { quantity: adjustQty });
@@ -165,11 +190,69 @@ export default function StockPage() {
     finally { setAdjusting(false); }
   }
 
-  const getBranchName = (id: string) => branches.find((b) => b.id === id)?.name ?? id;
+  const getBranchName = useCallback((id: string) => branches.find((b) => b.id === id)?.name ?? id, [branches]);
   const getUnitLabel = (id: string) => {
     const u = units.find((u) => u.id === id);
     return u ? `${u.unit || "ชิ้น"} (x${u.size})` : id;
   };
+  const isExpiringSoon = useCallback((expireDate?: string) => {
+    if (!expireDate) return false;
+    const date = new Date(expireDate);
+    if (Number.isNaN(date.getTime())) return false;
+    const boundary = new Date();
+    boundary.setDate(boundary.getDate() + 30);
+    return date <= boundary;
+  }, []);
+  const isExpired = useCallback((expireDate?: string) => {
+    if (!expireDate) return false;
+    const date = new Date(expireDate);
+    if (Number.isNaN(date.getTime())) return false;
+    return date < new Date();
+  }, []);
+  const selectedUnit = units.find((unit) => unit.id === stockForm.unitId) ?? null;
+  const selectedBranch = branches.find((branch) => branch.id === stockForm.branchId) ?? null;
+  const lowStockThreshold = Math.max(sheetProduct?.minStock ?? 0, 10);
+
+  function resetSheetFilters() {
+    setBranchFilter("ALL");
+    setUnitFilter("ALL");
+    setQuickFilter("ALL");
+    setSortMode("DEFAULT");
+  }
+
+  const filteredStocks = useMemo(() => {
+    const now = new Date();
+    const expiringBoundary = new Date();
+    expiringBoundary.setDate(now.getDate() + 30);
+
+    const nextStocks = stocks.filter((stock) => {
+      if (branchFilter !== "ALL" && stock.branchId !== branchFilter) return false;
+      if (unitFilter !== "ALL" && stock.unitId !== unitFilter) return false;
+      if (quickFilter === "LOW" && stock.quantity > lowStockThreshold) return false;
+      if (quickFilter === "EMPTY" && stock.quantity > 0) return false;
+      if (quickFilter === "EXPIRING") {
+        if (!stock.expireDate) return false;
+        const expireDate = new Date(stock.expireDate);
+        if (Number.isNaN(expireDate.getTime()) || expireDate > expiringBoundary) return false;
+      }
+      return true;
+    });
+
+    return nextStocks.sort((left, right) => {
+      if (sortMode === "QTY_ASC") return left.quantity - right.quantity;
+      if (sortMode === "QTY_DESC") return right.quantity - left.quantity;
+      if (sortMode === "BRANCH") return getBranchName(left.branchId).localeCompare(getBranchName(right.branchId), "th");
+      return 0;
+    });
+  }, [branchFilter, getBranchName, lowStockThreshold, quickFilter, sortMode, stocks, unitFilter]);
+
+  const stockSummary = useMemo(() => {
+    return {
+      totalQuantity: filteredStocks.reduce((sum, stock) => sum + (stock.quantity ?? 0), 0),
+      branchCount: new Set(filteredStocks.map((stock) => stock.branchId)).size,
+      unitCount: new Set(filteredStocks.map((stock) => stock.unitId)).size,
+    };
+  }, [filteredStocks]);
 
   const filtered = products.filter((p) =>
     !search ||
@@ -257,20 +340,110 @@ export default function StockPage() {
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto">
-            <div className="px-6 py-3 flex justify-end border-b">
-              <Button size="sm" onClick={openAddStock}>
-                <Plus className="h-4 w-4 mr-2" />เพิ่ม Stock
-              </Button>
+            <div className="px-6 py-4 border-b space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">คงเหลือตามตัวกรอง</p>
+                  <p className="text-lg font-semibold mt-1">{stockSummary.totalQuantity}</p>
+                </div>
+                <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">สาขาที่มีสต็อก</p>
+                  <p className="text-lg font-semibold mt-1">{stockSummary.branchCount}</p>
+                </div>
+                <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">หน่วยที่ใช้งาน</p>
+                  <p className="text-lg font-semibold mt-1">{stockSummary.unitCount}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+                  <div className="space-y-1">
+                    <Label>กรองตามสาขา</Label>
+                    <Select value={branchFilter} onValueChange={setBranchFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="ทุกสาขา" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">ทุกสาขา</SelectItem>
+                        {branches.map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>กรองตามหน่วย</Label>
+                    <Select value={unitFilter} onValueChange={setUnitFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="ทุกหน่วย" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">ทุกหน่วย</SelectItem>
+                        {units.map((unit) => (
+                          <SelectItem key={unit.id} value={unit.id}>{unit.unit || "ชิ้น"} (x{unit.size})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button size="sm" onClick={openAddStock} disabled={!canUpdateStock}>
+                  <Plus className="h-4 w-4 mr-2" />เพิ่ม Stock
+                </Button>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Button size="sm" variant={quickFilter === "ALL" ? "default" : "outline"} onClick={() => setQuickFilter("ALL")}>
+                    ทั้งหมด
+                  </Button>
+                  <Button size="sm" variant={quickFilter === "LOW" ? "default" : "outline"} onClick={() => setQuickFilter("LOW")}>
+                    คงเหลือต่ำ
+                  </Button>
+                  <Button size="sm" variant={quickFilter === "EXPIRING" ? "default" : "outline"} onClick={() => setQuickFilter("EXPIRING")}>
+                    ใกล้หมดอายุ
+                  </Button>
+                  <Button size="sm" variant={quickFilter === "EMPTY" ? "default" : "outline"} onClick={() => setQuickFilter("EMPTY")}>
+                    หมดแล้ว
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={resetSheetFilters}>
+                    ล้างตัวกรอง
+                  </Button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="space-y-1 sm:w-56">
+                    <Label>เรียงลำดับ</Label>
+                    <Select value={sortMode} onValueChange={(value: "DEFAULT" | "QTY_ASC" | "QTY_DESC" | "BRANCH") => setSortMode(value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="DEFAULT">ค่าเริ่มต้น</SelectItem>
+                        <SelectItem value="QTY_ASC">จำนวนน้อยไปมาก</SelectItem>
+                        <SelectItem value="QTY_DESC">จำนวนมากไปน้อย</SelectItem>
+                        <SelectItem value="BRANCH">เรียงตามสาขา</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground sm:pt-6">
+                    {quickFilter === "LOW" && `แสดงรายการที่คงเหลือไม่เกิน ${lowStockThreshold}`}
+                    {quickFilter === "EXPIRING" && "แสดงรายการที่หมดอายุภายใน 30 วัน"}
+                    {quickFilter === "EMPTY" && "แสดงเฉพาะรายการที่คงเหลือ 0"}
+                    {quickFilter === "ALL" && "ดูภาพรวมทั้งหมดแล้วค่อยกรองตามสาขาหรือหน่วยได้"}
+                  </p>
+                </div>
+              </div>
             </div>
 
             {stockLoading ? (
               <div className="flex justify-center py-12">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
               </div>
-            ) : stocks.length === 0 ? (
+            ) : filteredStocks.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
                 <Layers className="h-10 w-10 opacity-30" />
-                <p className="text-sm">ยังไม่มี stock</p>
+                <p className="text-sm">{stocks.length === 0 ? "ยังไม่มี stock" : "ไม่พบ stock ตามตัวกรอง"}</p>
               </div>
             ) : (
               <Table>
@@ -285,11 +458,22 @@ export default function StockPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stocks.map((s) => (
+                  {filteredStocks.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="text-sm">{getBranchName(s.branchId)}</TableCell>
                       <TableCell className="text-sm">{getUnitLabel(s.unitId)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{fmtDate(s.expireDate)}</TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={isExpired(s.expireDate) ? "text-destructive" : "text-muted-foreground"}>
+                            {fmtDate(s.expireDate)}
+                          </span>
+                          {isExpired(s.expireDate) ? (
+                            <Badge variant="destructive" className="shrink-0">หมดอายุ</Badge>
+                          ) : isExpiringSoon(s.expireDate) ? (
+                            <Badge variant="outline" className="shrink-0 border-yellow-500/50 text-yellow-700">ใกล้หมดอายุ</Badge>
+                          ) : null}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <span className={s.quantity <= 0 ? "text-destructive font-semibold" : s.quantity <= 10 ? "text-yellow-600 font-semibold" : "font-medium"}>
                           {s.quantity}
@@ -298,13 +482,13 @@ export default function StockPage() {
                       <TableCell className="text-right text-sm">฿{fmt(s.costPrice)}</TableCell>
                       <TableCell>
                         <div className="flex gap-1 justify-end">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" title="ปรับจำนวน" aria-label="ปรับจำนวน" onClick={() => openAdjust(s)}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" title="ปรับจำนวน" aria-label="ปรับจำนวน" onClick={() => openAdjust(s)} disabled={!canUpdateStock}>
                             <ArrowUpDown className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="แก้ไข" onClick={() => openEditStock(s)}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="แก้ไข" onClick={() => openEditStock(s)} disabled={!canUpdateStock}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" aria-label="ลบ" onClick={() => handleDeleteStock(s.id)}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" aria-label="ลบ" onClick={() => handleDeleteStock(s.id)} disabled={!canDeleteStock}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -336,11 +520,23 @@ export default function StockPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedBranch && <p className="text-xs text-muted-foreground">กำลังเพิ่ม stock ให้สาขา {selectedBranch.name}</p>}
+              </div>
+            )}
+            {editingStock && (
+              <div className="space-y-1">
+                <Label>สาขา</Label>
+                <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                  {getBranchName(editingStock.branchId)}
+                </div>
               </div>
             )}
             <div className="space-y-1">
               <Label>หน่วย</Label>
-              <Select value={stockForm.unitId} onValueChange={(v) => setStockForm((f) => ({ ...f, unitId: v }))}>
+              <Select value={stockForm.unitId} onValueChange={(v) => {
+                const unit = units.find((item) => item.id === v);
+                setStockForm((f) => ({ ...f, unitId: v, costPrice: unit?.costPrice ?? f.costPrice }));
+              }}>
                 <SelectTrigger><SelectValue placeholder="เลือกหน่วย (ถ้ามี)" /></SelectTrigger>
                 <SelectContent>
                   {units.map((u) => (
@@ -348,6 +544,11 @@ export default function StockPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedUnit && (
+                <p className="text-xs text-muted-foreground">
+                  หน่วยนี้มีขนาด x{selectedUnit.size} และต้นทุนมาตรฐาน ฿{fmt(selectedUnit.costPrice)}
+                </p>
+              )}
             </div>
             {!editingStock && (
               <div className="space-y-1">
@@ -374,7 +575,7 @@ export default function StockPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setStockOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleSaveStock} disabled={savingStock}>
+            <Button onClick={handleSaveStock} disabled={savingStock || !canUpdateStock}>
               {savingStock ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
           </DialogFooter>
@@ -406,7 +607,7 @@ export default function StockPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAdjustOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleAdjust} disabled={adjusting}>
+            <Button onClick={handleAdjust} disabled={adjusting || !canUpdateStock}>
               {adjusting ? "กำลังปรับ…" : "ยืนยัน"}
             </Button>
           </DialogFooter>

@@ -18,6 +18,7 @@ import { withRouteAccess } from "@/components/withRouteAccess";
 import type { Employee } from "@/types/pos";
 import type { User } from "@/types/um";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { hasPermission } from "@/lib/rbac";
 
 const EMPTY_FORM = { name: "", address: "", phone: "" };
 
@@ -32,6 +33,9 @@ interface Branch {
 }
 
 function BranchesPage() {
+  const canCreateBranch = hasPermission("branches:create");
+  const canUpdateBranch = hasPermission("branches:update");
+  const canDeleteBranch = hasPermission("branches:delete");
   const [items, setItems] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const confirm = useConfirm();
@@ -73,15 +77,18 @@ function BranchesPage() {
       .finally(() => setEmpLoading(false));
   }, []);
 
-  function openCreate() { setEditing(null); setForm(EMPTY_FORM); setOpen(true); }
+  function openCreate() { if (!canCreateBranch) return; setEditing(null); setForm(EMPTY_FORM); setOpen(true); }
 
   function openEdit(b: Branch) {
+    if (!canUpdateBranch) return;
     setEditing(b);
     setForm({ name: b.name ?? "", address: b.address ?? "", phone: b.phone ?? "" });
     setOpen(true);
   }
 
   async function handleSave() {
+    if (editing && !canUpdateBranch) return;
+    if (!editing && !canCreateBranch) return;
     if (!form.name.trim()) return toast.error("กรุณากรอกชื่อสาขา");
     setSaving(true);
     try {
@@ -95,12 +102,14 @@ function BranchesPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!canDeleteBranch) return;
     if (!(await confirm({ description: "ลบสาขานี้?", destructive: true }))) return;
     try { await deleteBranch(id); toast.success("ลบแล้ว"); loadBranches(); }
     catch { toast.error("ลบไม่สำเร็จ"); }
   }
 
   async function toggleStatus(b: Branch) {
+    if (!canUpdateBranch) return;
     const next = b.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
     try { await updateBranchStatus(b.id, { status: next }); toast.success("อัปเดตสถานะแล้ว"); loadBranches(); }
     catch { toast.error("ไม่สำเร็จ"); }
@@ -113,6 +122,7 @@ function BranchesPage() {
   }
 
   async function openAddEmployee() {
+    if (!canUpdateBranch) return;
     setSelectedUserId("");
     setSelectedRole("STAFF");
     setAddEmpOpen(true);
@@ -126,6 +136,7 @@ function BranchesPage() {
 
   async function handleAddEmployee() {
     if (!sheetBranch || !selectedUserId) return toast.error("กรุณาเลือกผู้ใช้");
+    if (!canUpdateBranch) return;
     setAddingEmp(true);
     try {
       await createEmployee({ branchId: sheetBranch.id, userId: selectedUserId, role: selectedRole });
@@ -138,6 +149,7 @@ function BranchesPage() {
   }
 
   async function handleRemoveEmployee(empId: string) {
+    if (!canUpdateBranch) return;
     if (!(await confirm({ description: "ลบพนักงานออกจากสาขา?", destructive: true }))) return;
     try {
       await deleteEmployee(empId);
@@ -160,7 +172,7 @@ function BranchesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">จัดการสาขา</h1>
-        <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />เพิ่มสาขา</Button>
+        {canCreateBranch && <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />เพิ่มสาขา</Button>}
       </div>
 
       <Card>
@@ -193,15 +205,21 @@ function BranchesPage() {
                         <Button size="sm" variant="outline" onClick={() => openEmployeeSheet(b)}>
                           <Users className="h-4 w-4 mr-1" />พนักงาน
                         </Button>
-                        <Button size="icon" variant="ghost" aria-label="เปลี่ยนสถานะ" onClick={() => toggleStatus(b)}>
-                          <ToggleLeft className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(b)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(b.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {canUpdateBranch && (
+                          <Button size="icon" variant="ghost" aria-label="เปลี่ยนสถานะ" onClick={() => toggleStatus(b)}>
+                            <ToggleLeft className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canUpdateBranch && (
+                          <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(b)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDeleteBranch && (
+                          <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(b.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -232,7 +250,7 @@ function BranchesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
+            <Button onClick={handleSave} disabled={saving || (editing ? !canUpdateBranch : !canCreateBranch)}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -246,7 +264,7 @@ function BranchesPage() {
 
           <div className="flex-1 overflow-y-auto">
             <div className="px-6 py-3 flex justify-end border-b">
-              <Button size="sm" onClick={openAddEmployee}>
+              <Button size="sm" onClick={openAddEmployee} disabled={!canUpdateBranch}>
                 <UserPlus className="h-4 w-4 mr-2" />เพิ่มพนักงาน
               </Button>
             </div>
@@ -273,7 +291,7 @@ function BranchesPage() {
                       <TableCell className="font-medium text-sm">{getUserLabel(emp.userId)}</TableCell>
                       <TableCell><Badge variant="secondary">{emp.role}</Badge></TableCell>
                       <TableCell>
-                        <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" aria-label="ลบพนักงาน" onClick={() => handleRemoveEmployee(emp.id)}>
+                        <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" aria-label="ลบพนักงาน" onClick={() => handleRemoveEmployee(emp.id)} disabled={!canUpdateBranch}>
                           <X className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -327,7 +345,7 @@ function BranchesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddEmpOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleAddEmployee} disabled={addingEmp || !selectedUserId}>
+            <Button onClick={handleAddEmployee} disabled={addingEmp || !selectedUserId || !canUpdateBranch}>
               {addingEmp ? "กำลังเพิ่ม…" : "เพิ่มพนักงาน"}
             </Button>
           </DialogFooter>

@@ -13,10 +13,14 @@ import { listSuppliers, createSupplier, updateSupplier, deleteSupplier } from "@
 import { withRouteAccess } from "@/components/withRouteAccess";
 import type { Supplier } from "@/types/pos";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { hasPermission } from "@/lib/rbac";
 
 const EMPTY = { name: "", phone: "", email: "", address: "", taxId: "" };
 
 function SuppliersPage() {
+  const canCreateSupplier = hasPermission("suppliers:create");
+  const canUpdateSupplier = hasPermission("suppliers:update");
+  const canDeleteSupplier = hasPermission("suppliers:delete");
   const [items, setItems] = useState<Supplier[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -36,14 +40,17 @@ function SuppliersPage() {
 
   useEffect(() => { load(); }, []);
 
-  function openCreate() { setEditing(null); setForm(EMPTY); setOpen(true); }
+  function openCreate() { if (!canCreateSupplier) return; setEditing(null); setForm(EMPTY); setOpen(true); }
   function openEdit(s: Supplier) {
+    if (!canUpdateSupplier) return;
     setEditing(s);
     setForm({ name: s.name ?? "", phone: s.phone ?? "", email: s.email ?? "", address: s.address ?? "", taxId: s.taxId ?? "" });
     setOpen(true);
   }
 
   async function handleSave() {
+    if (editing && !canUpdateSupplier) return;
+    if (!editing && !canCreateSupplier) return;
     if (!form.name.trim()) return toast.error("กรุณากรอกชื่อผู้จัดจำหน่าย");
     setSaving(true);
     try {
@@ -56,6 +63,7 @@ function SuppliersPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!canDeleteSupplier) return;
     if (!(await confirm({ description: "ลบผู้จัดจำหน่ายนี้?", destructive: true }))) return;
     try { await deleteSupplier(id); toast.success("ลบแล้ว"); load(); }
     catch { toast.error("ลบไม่สำเร็จ"); }
@@ -69,7 +77,7 @@ function SuppliersPage() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <h1 className="text-xl sm:text-2xl font-bold">ผู้จัดจำหน่าย</h1>
-        <Button onClick={openCreate} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />เพิ่ม</Button>
+        {canCreateSupplier && <Button onClick={openCreate} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />เพิ่ม</Button>}
       </div>
       <Card>
         <CardHeader className="pb-3">
@@ -94,8 +102,8 @@ function SuppliersPage() {
                     <TableCell className="hidden sm:table-cell">{s.email ?? "-"}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                        {canUpdateSupplier && <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>}
+                        {canDeleteSupplier && <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4" /></Button>}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -120,7 +128,7 @@ function SuppliersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
+            <Button onClick={handleSave} disabled={saving || (editing ? !canUpdateSupplier : !canCreateSupplier)}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

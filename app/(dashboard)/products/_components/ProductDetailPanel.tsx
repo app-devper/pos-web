@@ -17,6 +17,8 @@ import { CUSTOMER_TYPE_LABEL } from "@/app/(dashboard)/sale/_utils";
 interface Props {
   onEdit: () => void;
   onBack?: () => void;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
 type ProductDetailTab = "info" | "units" | "prices" | "stocks" | "history";
@@ -37,7 +39,7 @@ function InfoRow({ label, value, valueClass }: { label: string; value: string; v
   );
 }
 
-export default function ProductDetailPanel({ onEdit, onBack }: Props) {
+export default function ProductDetailPanel({ onEdit, onBack, canUpdate = false, canDelete = false }: Props) {
   const { state, actions } = useProductDetail();
   const {
     product, units, stocks, prices, branches, histories, loading,
@@ -95,9 +97,11 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
           <h2 className="text-lg font-semibold truncate">{product.name}</h2>
           </div>
         </div>
-        <Button size="sm" variant="outline" onClick={onEdit}>
-          <Pencil className="h-4 w-4 mr-1" />แก้ไข
-        </Button>
+        {canUpdate && (
+          <Button size="sm" variant="outline" onClick={onEdit}>
+            <Pencil className="h-4 w-4 mr-1" />แก้ไข
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -164,9 +168,11 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
           {/* ── Tab: หน่วยนับ ── */}
           <TabsContent value="units" className="overflow-y-auto m-0 flex-1 min-h-0">
             <div className="flex justify-end px-4 pt-3 pb-2">
-              <Button size="sm" onClick={() => actions.openUnitDialog()}>
-                <Plus className="h-4 w-4 mr-1" />เพิ่มหน่วย
-              </Button>
+              {canUpdate && (
+                <Button size="sm" onClick={() => actions.openUnitDialog()}>
+                  <Plus className="h-4 w-4 mr-1" />เพิ่มหน่วย
+                </Button>
+              )}
             </div>
             {units.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">ยังไม่มีหน่วยนับ</p>}
             {units.length > 0 && (
@@ -191,12 +197,16 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
                       <td className="px-4 py-2.5 text-muted-foreground">{u.volume && u.volume > 0 ? `${u.volume}${u.volumeUnit}` : "-"}</td>
                       <td className="px-2 py-2">
                         <div className="flex gap-1 justify-end">
-                          <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="แก้ไขหน่วย" onClick={() => actions.openUnitDialog(u)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" aria-label="ลบหน่วย" onClick={() => actions.deleteUnit(u.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {canUpdate && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="แก้ไขหน่วย" onClick={() => actions.openUnitDialog(u)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" aria-label="ลบหน่วย" onClick={() => actions.deleteUnit(u.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -218,9 +228,11 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
                       <span className="text-sm font-semibold text-foreground">{u.unit || "ชิ้น"}</span>
                       <span className="text-xs text-muted-foreground ml-2">ต้นทุน ฿{fmt(u.costPrice)}</span>
                     </div>
-                    <Button size="sm" onClick={() => actions.openPriceDialog(undefined, u.id)}>
-                      <Plus className="h-4 w-4 mr-1" />เพิ่มราคา
-                    </Button>
+                    {canUpdate && (
+                      <Button size="sm" onClick={() => actions.openPriceDialog(undefined, u.id)}>
+                        <Plus className="h-4 w-4 mr-1" />เพิ่มราคา
+                      </Button>
+                    )}
                   </div>
                   {unitPrices.length === 0 ? (
                     <p className="text-xs text-muted-foreground px-4 py-2">ยังไม่มีราคา</p>
@@ -240,12 +252,16 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
                             <td className="px-4 py-2.5 text-right font-semibold text-primary">฿{fmt(pr.price)}</td>
                             <td className="px-2 py-2">
                               <div className="flex gap-1 justify-end">
-                                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="แก้ไขราคา" onClick={() => actions.openPriceDialog(pr)}>
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" aria-label="ลบราคา" onClick={() => actions.deletePrice(pr.id)}>
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
+                                {canUpdate && (
+                                  <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="แก้ไขราคา" onClick={() => actions.openPriceDialog(pr)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {canDelete && (
+                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" aria-label="ลบราคา" onClick={() => actions.deletePrice(pr.id)}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
                               </div>
                             </td>
 						  </tr>
@@ -273,12 +289,16 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
                       <td className="px-4 py-2.5 text-right font-semibold text-primary">฿{fmt(pr.price)}</td>
                       <td className="px-2 py-2">
                         <div className="flex gap-1 justify-end">
-                          <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="แก้ไขราคา" onClick={() => actions.openPriceDialog(pr)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" aria-label="ลบราคา" onClick={() => actions.deletePrice(pr.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {canUpdate && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="แก้ไขราคา" onClick={() => actions.openPriceDialog(pr)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" aria-label="ลบราคา" onClick={() => actions.deletePrice(pr.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -293,12 +313,14 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
             <div className="flex items-center justify-between px-4 pt-3 pb-2">
               <p className="text-sm font-semibold">คงเหลือรวม: <span className={totalStock <= 0 ? "text-destructive" : totalStock <= 10 ? "text-yellow-600" : "text-primary"}>{totalStock} {product.unit || "ชิ้น"}</span></p>
               <div className="flex gap-1">
-                <Button size="sm" variant="outline" onClick={() => actions.openSequenceDialog()} disabled={stocks.length < 2}>
+                <Button size="sm" variant="outline" onClick={() => actions.openSequenceDialog()} disabled={!canUpdate || stocks.length < 2}>
                   <ListOrdered className="h-4 w-4 mr-1" />เรียงลำดับ
                 </Button>
-                <Button size="sm" onClick={() => actions.openStockDialog()}>
-                  <Plus className="h-4 w-4 mr-1" />เพิ่มสต็อก
-                </Button>
+                {canUpdate && (
+                  <Button size="sm" onClick={() => actions.openStockDialog()}>
+                    <Plus className="h-4 w-4 mr-1" />เพิ่มสต็อก
+                  </Button>
+                )}
               </div>
             </div>
             {stocks.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">ยังไม่มีสต็อก</p>}
@@ -320,10 +342,10 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
                     <tr key={s.id} className="border-b hover:bg-muted/20">
                       <td className="px-2 py-2">
                         <div className="flex flex-col items-center">
-                          <Button size="icon" variant="ghost" className="h-5 w-5" disabled={idx === 0} aria-label="เลื่อนขึ้น" onClick={() => actions.moveStock(idx, "up")}>
+                          <Button size="icon" variant="ghost" className="h-5 w-5" disabled={!canUpdate || idx === 0} aria-label="เลื่อนขึ้น" onClick={() => actions.moveStock(idx, "up")}>
                             <ChevronUp className="h-3 w-3" />
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-5 w-5" disabled={idx === stocks.length - 1} aria-label="เลื่อนลง" onClick={() => actions.moveStock(idx, "down")}>
+                          <Button size="icon" variant="ghost" className="h-5 w-5" disabled={!canUpdate || idx === stocks.length - 1} aria-label="เลื่อนลง" onClick={() => actions.moveStock(idx, "down")}>
                             <ChevronDown className="h-3 w-3" />
                           </Button>
                         </div>
@@ -337,6 +359,7 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
                       <td className="px-4 py-2.5 text-right">
                         <button
                           className={`font-semibold underline underline-offset-2 ${s.quantity <= 0 ? "text-destructive" : s.quantity <= 10 ? "text-yellow-600" : "text-primary"}`}
+                          disabled={!canUpdate}
                           onClick={() => actions.openAdjustDialog(s)}
                         >
                           {s.quantity}
@@ -344,12 +367,16 @@ export default function ProductDetailPanel({ onEdit, onBack }: Props) {
                       </td>
                       <td className="px-2 py-2">
                         <div className="flex gap-1 justify-end">
-                          <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="แก้ไขสต็อก" onClick={() => actions.openStockDialog(s)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" aria-label="ลบสต็อก" onClick={() => actions.deleteStock(s.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {canUpdate && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="แก้ไขสต็อก" onClick={() => actions.openStockDialog(s)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" aria-label="ลบสต็อก" onClick={() => actions.deleteStock(s.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

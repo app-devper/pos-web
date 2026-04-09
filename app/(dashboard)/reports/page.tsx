@@ -230,14 +230,8 @@ function ReportsPage() {
             <Button {...btnProps("sales-excel")} onClick={() => dl("sales-excel", "/reports/sales/excel", { startDate: toDayRange(startDate, "start"), endDate: toDayRange(endDate, "end") }, "sales-report.xlsx")}>
               <FileDown className="h-4 w-4" />{loading === "sales-excel" ? "กำลังดาวน์โหลด…" : "รายงานขาย (Excel)"}
             </Button>
-            <Button {...btnProps("sales-csv")} onClick={() => dl("sales-csv", "/reports/sales/csv", { startDate: toDayRange(startDate, "start"), endDate: toDayRange(endDate, "end") }, "sales-report.csv")}>
-              <FileDown className="h-4 w-4" />{loading === "sales-csv" ? "กำลังดาวน์โหลด…" : "รายงานขาย (CSV)"}
-            </Button>
             <Button {...btnProps("stocks-excel")} onClick={() => dl("stocks-excel", "/reports/stocks/excel", undefined, "stocks-report.xlsx")}>
               <FileDown className="h-4 w-4" />{loading === "stocks-excel" ? "กำลังดาวน์โหลด…" : "รายงานสต็อก (Excel)"}
-            </Button>
-            <Button {...btnProps("stocks-csv")} onClick={() => dl("stocks-csv", "/reports/stocks/csv", undefined, "stocks-report.csv")}>
-              <FileDown className="h-4 w-4" />{loading === "stocks-csv" ? "กำลังดาวน์โหลด…" : "รายงานสต็อก (CSV)"}
             </Button>
             <Button {...btnProps("price-tags")} onClick={() => printPriceListPdf("price-tags")}>
               <FileDown className="h-4 w-4" />{loading === "price-tags" ? "กำลังสร้าง…" : "ป้ายราคา (PDF จากหน้าเว็บ)"}

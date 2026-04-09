@@ -15,6 +15,7 @@ import { listPromotions, createPromotion, updatePromotion, deletePromotion } fro
 import { withRouteAccess } from "@/components/withRouteAccess";
 import type { Promotion, PromotionRequest } from "@/types/pos";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { hasPermission } from "@/lib/rbac";
 
 function toDateInput(d?: string) {
   if (!d) return "";
@@ -29,6 +30,9 @@ function toISODate(d: string) {
 const EMPTY: PromotionRequest = { code: "", name: "", description: "", type: "PERCENTAGE", value: 0, minPurchase: 0, maxDiscount: 0, startDate: "", endDate: "", status: "ACTIVE" };
 
 function PromotionsPage() {
+  const canCreatePromotion = hasPermission("promotions:create");
+  const canUpdatePromotion = hasPermission("promotions:update");
+  const canDeletePromotion = hasPermission("promotions:delete");
   const [items, setItems] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -47,8 +51,9 @@ function PromotionsPage() {
 
   useEffect(() => { load(); }, []);
 
-  function openCreate() { setEditing(null); setForm(EMPTY); setOpen(true); }
+  function openCreate() { if (!canCreatePromotion) return; setEditing(null); setForm(EMPTY); setOpen(true); }
   function openEdit(p: Promotion) {
+    if (!canUpdatePromotion) return;
     setEditing(p);
     setForm({
       code: p.code,
@@ -66,6 +71,8 @@ function PromotionsPage() {
   }
 
   async function handleSave() {
+    if (editing && !canUpdatePromotion) return;
+    if (!editing && !canCreatePromotion) return;
     if (!form.code.trim() || !form.name.trim()) return toast.error("กรุณากรอกรหัสและชื่อ");
     if (!form.startDate || !form.endDate) return toast.error("กรุณากรอกวันเริ่มต้นและวันสิ้นสุด");
     setSaving(true);
@@ -84,6 +91,7 @@ function PromotionsPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!canDeletePromotion) return;
     if (!(await confirm({ description: "ลบโปรโมชันนี้?", destructive: true }))) return;
     try { await deletePromotion(id); toast.success("ลบแล้ว"); load(); }
     catch { toast.error("ลบไม่สำเร็จ"); }
@@ -93,7 +101,7 @@ function PromotionsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">โปรโมชัน</h1>
-        <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />เพิ่มโปรโมชัน</Button>
+        {canCreatePromotion && <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />เพิ่มโปรโมชัน</Button>}
       </div>
       <Card><CardContent className="p-0">
         {loading ? <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
@@ -114,8 +122,8 @@ function PromotionsPage() {
                   </TableCell>
                   <TableCell><Badge variant={p.status === "ACTIVE" ? "default" : "secondary"}>{p.status}</Badge></TableCell>
                   <TableCell><div className="flex gap-1">
-                    <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                    {canUpdatePromotion && <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>}
+                    {canDeletePromotion && <Button size="icon" variant="ghost" className="text-destructive" aria-label="ลบ" onClick={() => handleDelete(p.id)}><Trash2 className="h-4 w-4" /></Button>}
                   </div></TableCell>
                 </TableRow>
               ))}
@@ -159,7 +167,7 @@ function PromotionsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
+            <Button onClick={handleSave} disabled={saving || (editing ? !canUpdatePromotion : !canCreatePromotion)}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

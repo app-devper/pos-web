@@ -18,6 +18,7 @@ import {
 import { withRouteAccess } from "@/components/withRouteAccess";
 import type { Receive, Supplier, ProductDetail, CreateReceiveItemData } from "@/types/pos";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { hasPermission } from "@/lib/rbac";
 
 const fmt = (n: number) => new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2 }).format(n ?? 0);
 
@@ -79,6 +80,10 @@ const EMPTY_STOCK_ITEM: StockItemForm = {
 const EMPTY_SUPPLIER_FORM = { name: "", phone: "", email: "", address: "", taxId: "" };
 
 function ReceivesPage() {
+  const canCreateReceive = hasPermission("receives:create");
+  const canUpdateReceive = hasPermission("receives:update");
+  const canDeleteReceive = hasPermission("receives:delete");
+  const canCreateSupplier = hasPermission("suppliers:create");
   // ─── List state ──────────────────────────────────────────
   const [items, setItems] = useState<Receive[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -162,6 +167,7 @@ function ReceivesPage() {
 
   // ─── Create / Edit GR ───────────────────────────────────
   function openCreateGr() {
+    if (!canCreateReceive) return;
     setGrEditing(null);
     setGrSupplierId("");
     setGrReference("");
@@ -174,11 +180,13 @@ function ReceivesPage() {
   }
 
   function openCreateSupplier() {
+    if (!canCreateSupplier) return;
     setSupplierForm(EMPTY_SUPPLIER_FORM);
     setSupplierOpen(true);
   }
 
   function openEditGr(r: Receive) {
+    if (!canUpdateReceive) return;
     setGrEditing(r);
     setGrSupplierId(r.supplierId ?? "");
     setGrReference(r.reference ?? "");
@@ -245,6 +253,8 @@ function ReceivesPage() {
   }
 
   async function handleSaveGr() {
+    if (grEditing && !canUpdateReceive) return;
+    if (!grEditing && !canCreateReceive) return;
     if (!grSupplierId) {
       setGrErrors((prev) => ({ ...prev, supplierId: "กรุณาเลือกผู้จัดจำหน่าย" }));
       return toast.error("กรุณาเลือกผู้จัดจำหน่าย");
@@ -295,6 +305,7 @@ function ReceivesPage() {
   }
 
   async function handleCreateSupplier() {
+    if (!canCreateSupplier) return;
     if (!supplierForm.name.trim()) return toast.error("กรุณากรอกชื่อผู้จัดจำหน่าย");
     if (!supplierForm.address.trim()) return toast.error("กรุณากรอกที่อยู่");
     setSupplierSaving(true);
@@ -325,6 +336,7 @@ function ReceivesPage() {
 
   // ─── Import to Stock ────────────────────────────────────
   async function handleImportToStock(id: string) {
+    if (!canUpdateReceive) return;
     if (!(await confirm({ description: "นำเข้าสินค้าลงสต็อก? เมื่อนำเข้าแล้วจะไม่สามารถแก้ไขได้" }))) return;
     setImporting(true);
     try {
@@ -341,6 +353,7 @@ function ReceivesPage() {
 
   // ─── Delete ──────────────────────────────────────────────
   async function handleDelete(id: string) {
+    if (!canDeleteReceive) return;
     if (!(await confirm({ description: "ลบรายการรับสินค้านี้?", destructive: true }))) return;
     try {
       await deleteReceive(id);
@@ -367,7 +380,9 @@ function ReceivesPage() {
             <Button size="icon" variant="ghost" className="h-8 w-8" title="รีเฟรช" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
-            <Button size="sm" onClick={openCreateGr}><Plus className="h-4 w-4 mr-1" />สร้าง</Button>
+            {canCreateReceive && (
+              <Button size="sm" onClick={openCreateGr}><Plus className="h-4 w-4 mr-1" />สร้าง</Button>
+            )}
           </div>
         </div>
         {/* Date filter */}
@@ -447,9 +462,11 @@ function ReceivesPage() {
                             {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        <Button type="button" variant="outline" onClick={openCreateSupplier}>
-                          <Plus className="h-4 w-4 mr-1" />เพิ่ม
-                        </Button>
+                        {canCreateSupplier && (
+                          <Button type="button" variant="outline" onClick={openCreateSupplier}>
+                            <Plus className="h-4 w-4 mr-1" />เพิ่ม
+                          </Button>
+                        )}
                       </div>
                       {grErrors.supplierId && <p className="text-xs text-destructive">{grErrors.supplierId}</p>}
                     </div>
@@ -537,7 +554,7 @@ function ReceivesPage() {
                       }} />
                       {grErrors.expireDate && <p className="text-xs text-destructive">{grErrors.expireDate}</p>}
                     </div>
-                    <div className="flex items-end"><Button onClick={addItemToGr} variant="secondary" className="w-full"><Plus className="h-4 w-4 mr-1" />เพิ่ม</Button></div>
+                    <div className="flex items-end"><Button onClick={addItemToGr} variant="secondary" className="w-full" disabled={grEditing ? !canUpdateReceive : !canCreateReceive}><Plus className="h-4 w-4 mr-1" />เพิ่ม</Button></div>
                   </div>
 
                   {grItems.length > 0 && (
@@ -561,7 +578,7 @@ function ReceivesPage() {
                                 <TableCell className="text-xs text-right">฿{fmt(it.costPrice)}</TableCell>
                                 <TableCell className="text-xs">{it.lotNumber}</TableCell>
                                 <TableCell className="text-xs">{it.expireDate}</TableCell>
-                                <TableCell><Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" aria-label="ลบรายการ" onClick={() => removeItemFromGr(i)}><Trash2 className="h-3 w-3" /></Button></TableCell>
+                                <TableCell><Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" aria-label="ลบรายการ" onClick={() => removeItemFromGr(i)} disabled={grEditing ? !canUpdateReceive : !canCreateReceive}><Trash2 className="h-3 w-3" /></Button></TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -574,7 +591,7 @@ function ReceivesPage() {
             {/* Footer */}
             <div className="shrink-0 border-t px-4 sm:px-6 py-4 flex justify-end gap-2">
               <Button variant="outline" onClick={closeGrPanel}>ยกเลิก</Button>
-              <Button onClick={handleSaveGr} disabled={grSaving || grItems.length === 0}>
+              <Button onClick={handleSaveGr} disabled={grSaving || grItems.length === 0 || (grEditing ? !canUpdateReceive : !canCreateReceive)}>
                 {grSaving ? "กำลังบันทึก…" : `บันทึก (${grItems.length} รายการ)`}
               </Button>
             </div>
@@ -595,15 +612,19 @@ function ReceivesPage() {
               <div className="flex gap-1">
                 {detail.status !== "IMPORTED" && (
                   <>
-                    <Button size="sm" variant="default" onClick={() => handleImportToStock(detail.id)} disabled={importing || !detail.items?.length}>
+                    <Button size="sm" variant="default" onClick={() => handleImportToStock(detail.id)} disabled={importing || !detail.items?.length || !canUpdateReceive}>
                       <PackageCheck className="h-4 w-4 mr-1" />{importing ? "กำลังนำเข้า…" : "นำเข้าสต็อก"}
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => openEditGr(detail)}>
-                      <Pencil className="h-4 w-4 mr-1" />แก้ไข
-                    </Button>
-                    <Button size="sm" variant="outline" className="text-destructive border-destructive/30" onClick={() => handleDelete(detail.id)}>
-                      <Trash2 className="h-4 w-4 mr-1" />ลบ
-                    </Button>
+                    {canUpdateReceive && (
+                      <Button size="sm" variant="outline" onClick={() => openEditGr(detail)}>
+                        <Pencil className="h-4 w-4 mr-1" />แก้ไข
+                      </Button>
+                    )}
+                    {canDeleteReceive && (
+                      <Button size="sm" variant="outline" className="text-destructive border-destructive/30" onClick={() => handleDelete(detail.id)}>
+                        <Trash2 className="h-4 w-4 mr-1" />ลบ
+                      </Button>
+                    )}
                   </>
                 )}
               </div>
@@ -657,9 +678,11 @@ function ReceivesPage() {
           <div className="hidden md:flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
             <Package className="h-12 w-12 opacity-20" />
             <p className="text-sm">เลือกใบรับสินค้าเพื่อดูรายละเอียด</p>
-            <Button variant="outline" size="sm" onClick={openCreateGr}>
-              <Plus className="h-4 w-4 mr-1" />สร้างใบรับสินค้า
-            </Button>
+            {canCreateReceive && (
+              <Button variant="outline" size="sm" onClick={openCreateGr}>
+                <Plus className="h-4 w-4 mr-1" />สร้างใบรับสินค้า
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -682,7 +705,7 @@ function ReceivesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSupplierOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleCreateSupplier} disabled={supplierSaving}>
+            <Button onClick={handleCreateSupplier} disabled={supplierSaving || !canCreateSupplier}>
               {supplierSaving ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
           </DialogFooter>

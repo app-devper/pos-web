@@ -12,6 +12,7 @@ import { listOrders, deleteOrder, getOrder } from "@/lib/pos-api";
 import { PAYMENT_LABEL, getOrderPayments, getPaymentSummary } from "@/lib/payment-summary";
 import { useConfirm } from "@/components/ConfirmDialog";
 import type { Order, OrderDetail } from "@/types/pos";
+import { hasPermission } from "@/lib/rbac";
 
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   ACTIVE: { label: "สำเร็จ", variant: "default" },
@@ -20,7 +21,19 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   CANCELLED: { label: "ยกเลิก", variant: "destructive" },
 };
 
+function formatLocalDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toDayRange(date: string, boundary: "start" | "end") {
+  return `${date}T${boundary === "start" ? "00:00:00.000" : "23:59:59.999"}`;
+}
+
 export default function OrdersPage() {
+  const canDeleteOrder = hasPermission("orders:delete");
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -28,9 +41,9 @@ export default function OrdersPage() {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(1);
-    return d.toISOString().split("T")[0];
+    return formatLocalDateInput(d);
   });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState(() => formatLocalDateInput(new Date()));
   const [detail, setDetail] = useState<OrderDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const confirm = useConfirm();
@@ -43,10 +56,7 @@ export default function OrdersPage() {
   const load = useCallback(() => {
     const { startDate: currentStartDate, endDate: currentEndDate } = dateRangeRef.current;
     setLoading(true);
-    listOrders(
-      new Date(currentStartDate).toISOString(),
-      new Date(currentEndDate + "T23:59:59").toISOString()
-    )
+    listOrders(toDayRange(currentStartDate, "start"), toDayRange(currentEndDate, "end"))
       .then((data) => setOrders(Array.isArray(data) ? data : []))
       .catch(() => toast.error("โหลดข้อมูลไม่สำเร็จ — ลองใหม่อีกครั้ง"))
       .finally(() => setLoading(false));
@@ -64,6 +74,7 @@ export default function OrdersPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!canDeleteOrder) return;
     if (!(await confirm({ description: "ลบรายการขายนี้?", destructive: true }))) return;
     try {
       await deleteOrder(id);
@@ -260,9 +271,11 @@ export default function OrdersPage() {
                   {STATUS_MAP[detail.status]?.label ?? detail.status}
                 </Badge>
                 <Separator orientation="vertical" className="h-5 opacity-40" />
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(detail.id)} aria-label="ลบรายการ">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                {canDeleteOrder && (
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(detail.id)} aria-label="ลบรายการ">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 <Button size="icon" variant="ghost" className="h-7 w-7 hidden sm:flex" onClick={() => setDetail(null)} aria-label="ปิดรายละเอียด">
                   <X className="h-4 w-4" />
                 </Button>

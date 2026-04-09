@@ -19,11 +19,15 @@ import {
 } from "@/lib/um-api";
 import { withRouteAccess } from "@/components/withRouteAccess";
 import type { User, CreateUserRequest, UpdateUserRequest, Role, UserStatus } from "@/types/um";
+import { hasPermission } from "@/lib/rbac";
 
 const EMPTY_CREATE: CreateUserRequest = { firstName: "", lastName: "", username: "", password: "", clientId: "", phone: "", email: "" };
 const EMPTY_EDIT: UpdateUserRequest = { firstName: "", lastName: "", phone: "", email: "" };
 
 function UsersPage() {
+  const canCreateUser = hasPermission("users:create");
+  const canUpdateUser = hasPermission("users:update");
+  const canDeleteUser = hasPermission("users:delete");
   const [items, setItems] = useState<User[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -63,6 +67,7 @@ function UsersPage() {
   }, []);
 
   async function handleCreate() {
+    if (!canCreateUser) return;
     if (!createForm.username || !createForm.password)
       return toast.error("กรุณากรอก username และ password");
     setCreating(true);
@@ -73,6 +78,7 @@ function UsersPage() {
   }
 
   function openEdit(u: User) {
+    if (!canUpdateUser) return;
     setEditTarget(u);
     setEditForm({ firstName: u.firstName ?? "", lastName: u.lastName ?? "", phone: u.phone ?? "", email: u.email ?? "" });
     setEditOpen(true);
@@ -80,30 +86,35 @@ function UsersPage() {
 
   async function handleEdit() {
     if (!editTarget) return;
+    if (!canUpdateUser) return;
     setEditing(true);
     try { await updateUser(editTarget.id, editForm); toast.success("อัปเดตแล้ว"); setEditOpen(false); load(); }
     catch { toast.error("บันทึกไม่สำเร็จ"); } finally { setEditing(false); }
   }
 
   async function handleDelete(id: string) {
+    if (!canDeleteUser) return;
     if (!(await confirm({ description: "ลบผู้ใช้นี้?", destructive: true }))) return;
     try { await deleteUser(id); toast.success("ลบแล้ว"); load(); }
     catch (e: unknown) { toast.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "ลบไม่สำเร็จ"); }
   }
 
   async function handleToggleStatus(u: User) {
+    if (!canUpdateUser) return;
     const next: UserStatus = u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
     try { await updateUserStatus(u.id, { status: next }); toast.success("อัปเดตสถานะแล้ว"); load(); }
     catch { toast.error("ไม่สำเร็จ"); }
   }
 
   async function handleSetRole(id: string, role: Role) {
+    if (!canUpdateUser) return;
     try { await updateUserRole(id, { role }); toast.success("อัปเดต role แล้ว"); load(); }
     catch { toast.error("ไม่สำเร็จ"); }
   }
 
   async function handleSetPassword() {
     if (!pwTarget || !newPw || newPw.length < 8) return toast.error("รหัสผ่านต้องอย่างน้อย 8 ตัวอักษร");
+    if (!canUpdateUser) return;
     setSettingPw(true);
     try { await setUserPassword(pwTarget.id, { password: newPw }); toast.success("ตั้งรหัสผ่านแล้ว"); setPwOpen(false); setNewPw(""); }
     catch { toast.error("ไม่สำเร็จ"); } finally { setSettingPw(false); }
@@ -122,7 +133,7 @@ function UsersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">จัดการผู้ใช้ (UM)</h1>
-        <Button onClick={() => { setCreateForm({ ...EMPTY_CREATE }); setCreateOpen(true); }}><Plus className="h-4 w-4 mr-2" />เพิ่มผู้ใช้</Button>
+        {canCreateUser && <Button onClick={() => { setCreateForm({ ...EMPTY_CREATE }); setCreateOpen(true); }}><Plus className="h-4 w-4 mr-2" />เพิ่มผู้ใช้</Button>}
       </div>
 
       <Card>
@@ -160,11 +171,11 @@ function UsersPage() {
                           <Button size="icon" variant="ghost" aria-label="ตัวเลือกเพิ่มเติม"><MoreHorizontal className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(u)}><Pencil className="h-4 w-4 mr-2" />แก้ไข</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleToggleStatus(u)}><ToggleLeft className="h-4 w-4 mr-2" />{u.status === "ACTIVE" ? "ระงับ" : "เปิดใช้งาน"}</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setPwTarget(u); setNewPw(""); setPwOpen(true); }}><KeyRound className="h-4 w-4 mr-2" />ตั้งรหัสผ่าน</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleSetRole(u.id, u.role === "USER" ? "ADMIN" : "USER")}><ShieldCheck className="h-4 w-4 mr-2" />สลับเป็น {u.role === "USER" ? "ADMIN" : "USER"}</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(u.id)}><Trash2 className="h-4 w-4 mr-2" />ลบ</DropdownMenuItem>
+                          {canUpdateUser && <DropdownMenuItem onClick={() => openEdit(u)}><Pencil className="h-4 w-4 mr-2" />แก้ไข</DropdownMenuItem>}
+                          {canUpdateUser && <DropdownMenuItem onClick={() => handleToggleStatus(u)}><ToggleLeft className="h-4 w-4 mr-2" />{u.status === "ACTIVE" ? "ระงับ" : "เปิดใช้งาน"}</DropdownMenuItem>}
+                          {canUpdateUser && <DropdownMenuItem onClick={() => { setPwTarget(u); setNewPw(""); setPwOpen(true); }}><KeyRound className="h-4 w-4 mr-2" />ตั้งรหัสผ่าน</DropdownMenuItem>}
+                          {canUpdateUser && <DropdownMenuItem onClick={() => handleSetRole(u.id, u.role === "USER" ? "ADMIN" : "USER")}><ShieldCheck className="h-4 w-4 mr-2" />สลับเป็น {u.role === "USER" ? "ADMIN" : "USER"}</DropdownMenuItem>}
+                          {canDeleteUser && <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(u.id)}><Trash2 className="h-4 w-4 mr-2" />ลบ</DropdownMenuItem>}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -190,7 +201,7 @@ function UsersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleCreate} disabled={creating}>{creating ? "กำลังสร้าง…" : "สร้าง"}</Button>
+            <Button onClick={handleCreate} disabled={creating || !canCreateUser}>{creating ? "กำลังสร้าง…" : "สร้าง"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -209,7 +220,7 @@ function UsersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleEdit} disabled={editing}>{editing ? "กำลังบันทึก…" : "บันทึก"}</Button>
+            <Button onClick={handleEdit} disabled={editing || !canUpdateUser}>{editing ? "กำลังบันทึก…" : "บันทึก"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -224,7 +235,7 @@ function UsersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPwOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleSetPassword} disabled={settingPw}>{settingPw ? "กำลังตั้ง…" : "ตั้งรหัสผ่าน"}</Button>
+            <Button onClick={handleSetPassword} disabled={settingPw || !canUpdateUser}>{settingPw ? "กำลังตั้ง…" : "ตั้งรหัสผ่าน"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
